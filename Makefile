@@ -3,18 +3,25 @@
 #                                                                              #
 # Description: This file contains the make rules for Recitation 1.             #
 #                                                                              #
-# Authors: Athula Balachandran <abalacha@cs.cmu.edu>,                          #
-#          Wolf Richter <wolf@cs.cmu.edu>                                      #
+# Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
 #                                                                              #
 ################################################################################
 
-default: echo_server echo_client
 
-echo_server:
-	@gcc echo_server.c -o echo_server -Wall -Werror
 
-echo_client:
-	@gcc echo_client.c -o echo_client -Wall -Werror
+CFLAGS = -Wall -g -Werror -lefence -Wextra
+CC = gcc
+
+all: lisod echo_client
+
+lisod: lisod.o 
+	${CC} ${CFLAGS} lisod.o -o $@
+
+echo_client: echo_client.o 
+	${CC} ${CFLAGS} echo_client.o -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	@rm echo_server echo_client
+	rm -f *~ *.o lisod echo_client

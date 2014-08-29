@@ -65,6 +65,7 @@ int main(int argc, char* argv[])
     int bytes_received;
     fprintf(stdout, "Sending %s", msg);
     send(sock, msg , strlen(msg), 0);
+        
     if((bytes_received = recv(sock, buf, BUF_SIZE, 0)) > 1)
     {
         buf[bytes_received] = '\0';
@@ -75,3 +76,5 @@ int main(int argc, char* argv[])
     close(sock);    
     return EXIT_SUCCESS;
 }
+
+

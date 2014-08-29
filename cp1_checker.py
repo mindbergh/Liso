@@ -23,6 +23,8 @@ for i in xrange(numConnections):
 	s = socket(AF_INET, SOCK_STREAM)	
 	s.connect((serverHost, serverPort))
 	socketList.append(s)
+	print(i)
+
 
 
 for i in xrange(numTrials):
@@ -38,12 +40,18 @@ for i in xrange(numTrials):
 			randomData.append(str(random_len)+"\n"+random_string) 
 			randomLen.append(random_len+len(str(random_len))+1) 
 			socketSubset[j].send(randomData[j])
+			print("Send " + str(randomLen[j]))
+
 
 	for j in xrange(numWritesReads):
 			data = socketSubset[j].recv(randomLen[j])
 			if(data != randomData[j]):
 				sys.stderr.write("Error: Data received is not the same as sent! \n")
+				print(data + " != " + randomData[j])
+				if data == "":
+					print "Recv return \"\""
 				sys.exit(1)
+			print(str(j) + " Match!!!")
 				
 
 for i in xrange(numConnections):
