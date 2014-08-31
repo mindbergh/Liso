@@ -55,7 +55,15 @@ int main(int argc, char* argv[]) {
     socklen_t cli_size;
     struct sockaddr cli_addr;
 
-    int http_port;
+    /* Liso argumetns */
+    int http_port;      /* the port for the HTTP server to listen on */
+    int https_port;
+    char *log_file;
+    char *lock_file;
+    char *www;
+    char *cgi;
+    char *pri_key;
+    char *cert;
 
     Pool pool;
 
@@ -65,6 +73,14 @@ int main(int argc, char* argv[]) {
 
     /* Parse arguments */
     http_port = atoi(argv[1]);
+    https_port = atoi(argv[2]);
+    log_file = argv[3];
+    lock_file = argv[4];
+    www = argv[5];
+    cgi = argv[6];
+    pri_key = argv[7];
+    cert = argv[8];
+    
 
 
 

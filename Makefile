@@ -9,7 +9,7 @@
 
 
 
-CFLAGS = -Wall -g -Werror -lefence -Wextra
+CFLAGS = -Wall -g -Werror  -Wextra
 CC = gcc
 
 all: lisod echo_client

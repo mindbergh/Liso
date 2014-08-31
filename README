@@ -1,10 +1,9 @@
 ################################################################################
 # README                                                                       #
 #                                                                              #
-# Description: This file serves as a README and documentation for CP1 starter. #
+# Description: This file serves as a README and documentation for Checkpoint1. #
 #                                                                              #
-# Authors: Athula Balachandran <abalacha@cs.cmu.edu>,                          #
-#          Wolf Richter <wolf@cs.cmu.edu>                                      #
+# Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
 #                                                                              #
 ################################################################################
 
@@ -27,11 +26,11 @@
 Here is a listing of all files associated with Recitation 1 and what their'
 purpose is:
 
-                    .../README                  - Current document 
-                    .../src/echo_client.c       - Simple echo network client
-                    .../src/echo_server.c       - Simple echo network server
-                    .../src/Makefile            - Contains rules for make
-                    .../src/cp1_checker.py      - Python test script for CP1
+                    .../README              - Current document 
+                    .../echo_client.c       - Simple echo network client
+                    .../lisod.c             - Simple echo network server
+                    .../Makefile            - Contains rules for make
+                    .../cp1_checker.py      - Python test script for CP1
 
 
 
@@ -44,7 +43,7 @@ Building and executing the echo code should be very simple:
                     cd src
                     make
                     ./echo_server
-                    ./echo_client localhost 9999
+                    ./echo_client 127.0.0.1 9999
 
 This should allow you to input characters on stdin which will be sent to the
 echo server.  The echo server has a hard-coded serving port of 9999.  Any input
@@ -57,7 +56,7 @@ communicating with the server:
                     cd src
                     make
                     ./echo_server
-                    telnet localhost 9999
+                    telnet 127.0.0.1 9999
 
 The test Python script takes a series of arguments and can be run as:
 
