@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 #define BUF_SIZE 4096
-#define ARG_NUMBER 1   /* The number of argument lisod takes*/
+#define ARG_NUMBER 8   /* The number of argument lisod takes*/
 #define LISTENQ  1024  /* second argument to listen() */
 
 /** @brief The pool of fd that works with select()
@@ -55,15 +55,7 @@ int main(int argc, char* argv[]) {
     socklen_t cli_size;
     struct sockaddr cli_addr;
 
-    /* Liso argumetns */
-    int http_port;      /* the port for the HTTP server to listen on */
-    int https_port;
-    char *log_file;
-    char *lock_file;
-    char *www;
-    char *cgi;
-    char *pri_key;
-    char *cert;
+    int http_port;
 
     Pool pool;
 
@@ -73,13 +65,7 @@ int main(int argc, char* argv[]) {
 
     /* Parse arguments */
     http_port = atoi(argv[1]);
-    https_port = atoi(argv[2]);
-    log_file = argv[3];
-    lock_file = argv[4];
-    www = argv[5];
-    cgi = argv[6];
-    pri_key = argv[7];
-    cert = argv[8];
+    https_port = ato1(argv[2]);
     
 
 
@@ -104,19 +90,14 @@ int main(int argc, char* argv[]) {
                     &cli_size)) == -1) {
                 close(listen_sock);
                 fprintf(stderr, "Error accepting connection.\n");
-                return EXIT_FAILURE;
+                continue;
             }
             add_client(client_sock, &pool);
-            
-        } else {
-       
+        } else {       
             serve_clients(&pool, listen_sock);
         }
-        
     }
-
     close_socket(listen_sock);
-
     return EXIT_SUCCESS;
 }
 
@@ -225,13 +206,17 @@ void add_client(int conn_sock, Pool *p) {
 void serve_clients(Pool *p, int listen_sock) {
     int conn_sock, i;
     ssize_t readret;
-    char buf[BUF_SIZE];
+    char *buf;
+    char *msg_size[10];
 
     for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
         conn_sock = p->client_sock[i];
 
         if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_set))) {
             p->nready--;
+
+
+
             if ((readret = recv(conn_sock, buf, BUF_SIZE, 0)) > 1) {
                 printf("Server received %d bytes data on %d\n", 
                 (int)readret, conn_sock);
@@ -253,7 +238,7 @@ void serve_clients(Pool *p, int listen_sock) {
                 if (close_socket(conn_sock)) {
                     close_socket(listen_sock);
                     fprintf(stderr, "Error closing client socket.\n");
-                    exit(EXIT_FAILURE);                     
+                                         
                 }
                 FD_CLR(conn_sock, &p->read_set);
                 p->client_sock[i] = -1;
