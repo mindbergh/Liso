@@ -14,14 +14,18 @@ CC = gcc
 
 all: lisod echo_client
 
-lisod: lisod.o 
-	${CC} ${CFLAGS} lisod.o -o $@
+mio.o: mio.c mio.h
+	$(CC) $(CFLAGS) -c mio.c
+
+echo_client.o: echo_client.c
+	$(CC) $(CFLAGS) -c echo_client.c
+
+lisod.o: lisod.c
+	$(CC) $(CFLAGS) -c lisod.c
+
+lisod: lisod.o mio.o
 
 echo_client: echo_client.o 
-	${CC} ${CFLAGS} echo_client.o -o $@
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f *~ *.o lisod echo_client

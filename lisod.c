@@ -12,7 +12,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "mio.h"
+
 #define BUF_SIZE 4096
+#define MAX_SIZE_INFO 8 /* Max length of size info for the incomming msg */
 #define ARG_NUMBER 8   /* The number of argument lisod takes*/
 #define LISTENQ  1024  /* second argument to listen() */
 
@@ -55,7 +58,14 @@ int main(int argc, char* argv[]) {
     socklen_t cli_size;
     struct sockaddr cli_addr;
 
-    int http_port;
+    int http_port;  /* The port for the HTTP server to listen on */
+    int https_port; /* The port for the HTTPS server to listen on */
+    char *log_file; /* File to send log messages to (debug, info, error) */
+    char *lock_file; /* File to lock on when becoming a daemon process */
+    char *www;  /* Folder containing a tree to serve as the root of a website */
+    char *cgi; /* Script where to redirect all CGI URIs */
+    char *pri_key; /* Private key file path */
+    char *cert;  /* Certificate file path */
 
     Pool pool;
 
@@ -65,7 +75,13 @@ int main(int argc, char* argv[]) {
 
     /* Parse arguments */
     http_port = atoi(argv[1]);
-    https_port = ato1(argv[2]);
+    https_port = atoi(argv[2]);
+    log_file = argv[3];
+    lock_file = argv[4];
+    www = argv[5];
+    cgi = argv[6];
+    pri_key = argv[7];
+    cert = argv[8];
     
 
 
@@ -205,9 +221,10 @@ void add_client(int conn_sock, Pool *p) {
  */
 void serve_clients(Pool *p, int listen_sock) {
     int conn_sock, i;
+    int size;
     ssize_t readret;
     char *buf;
-    char *msg_size[10];
+    char *msg_size[MAX_SIZE_INFO];
 
     for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
         conn_sock = p->client_sock[i];
@@ -215,13 +232,44 @@ void serve_clients(Pool *p, int listen_sock) {
         if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_set))) {
             p->nready--;
 
+            if ((readret = mio_recvline(conn_sock, msg_size, MAX_SIZE_INFO))) {
+                msg_size[readret - 1] = '\0';
+                size = atoi((char *)msg_size);
+                if ((buf = malloc(size + readret)) == NULL) {
+                    fprintf(stderr, "serve_clients: malloc return NULL\n");
+                    if (close_socket(conn_sock)) {
+                        close_socket(listen_sock);
+                        fprintf(stderr, "Error closing client socket.\n");
+                        
+                    }
+                    FD_CLR(conn_sock, &p->read_set);
+                    p->client_sock[i] = -1;
+                    continue;
+                }
+                
+                memcpy(buf, msg_size, readret - 1);
+                buf[readret - 1] = '\n';
+                    
+            } else {
+                if (readret == 0)
+                    printf("serve_clients: socket %d hung up\n", conn_sock);
+                else
+                    fprintf(stderr, "serve_clients: recv return -1\n");
+                if (close_socket(conn_sock)) {
+                    close_socket(listen_sock);
+                    fprintf(stderr, "Error closing client socket.\n");
+                }
+                FD_CLR(conn_sock, &p->read_set);
+                p->client_sock[i] = -1;
+                continue;
+                
+            }
 
-
-            if ((readret = recv(conn_sock, buf, BUF_SIZE, 0)) > 1) {
+            if ((readret += mio_recvn(conn_sock, buf + readret, size)) > 1) {
                 printf("Server received %d bytes data on %d\n", 
                 (int)readret, conn_sock);
 
-                if (send(conn_sock, buf, readret, 0) != readret) {
+                if (mio_sendn(conn_sock, buf, readret) != readret) {
                     close_socket(conn_sock);
                     close_socket(listen_sock);
                     fprintf(stderr, "Error sending to client.\n");
@@ -229,7 +277,7 @@ void serve_clients(Pool *p, int listen_sock) {
                 }
                 printf("Server sent %d bytes data to %d\n", 
                        (int)readret, conn_sock);
-                memset(buf, 0, BUF_SIZE);
+                free(buf);
             } else {
                 if (readret == 0) 
                     printf("serve_clients: socket %d hung up\n", conn_sock);
