@@ -21,7 +21,7 @@
 #define MAX_SIZE_INFO 8 /* Max length of size info for the incomming msg */
 #define ARG_NUMBER 8   /* The number of argument lisod takes*/
 #define LISTENQ  20  /* second argument to listen() */
-#define VERBOSE  1
+#define VERBOSE  0
 
 
 
