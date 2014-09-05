@@ -21,7 +21,7 @@
 #define MAX_SIZE_INFO 8 /* Max length of size info for the incomming msg */
 #define ARG_NUMBER 8   /* The number of argument lisod takes*/
 #define LISTENQ  20  /* second argument to listen() */
-#define VERBOSE  0
+#define VERBOSE  1
 
 
 
@@ -251,7 +251,6 @@ void add_client(int conn_sock, Pool *p) {
  */
 void serve_clients(Pool *p) {
     int conn_sock, i;
-    int keep_reading = 1;
     ssize_t readret;
     size_t buf_size;
     if (VERBOSE)
@@ -262,14 +261,14 @@ void serve_clients(Pool *p) {
         if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_set))) {
             p->nready--;
             
-            while (keep_reading) {
+            while (1) {
                 buf_size = p->buf[i]->size - p->buf[i]->cur_size;
                 
                 readret = recv(conn_sock, 
                                 (p->buf[i]->buf + p->buf[i]->cur_size), 
                                 buf_size, 0);
                 if (readret < buf_size)
-                    keep_reading = 0;
+                    break;
 
                 p->buf[i]->cur_size += readret;
                 //printf("receive 1 byte\n");
@@ -325,8 +324,8 @@ void server_send(Pool *p) {
 
         if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_write_set))) {
             p->nready--;
-            // if (p->buf[i]->cur_size == 0)
-            //     continue;
+            if (p->buf[i]->cur_size == 0)
+                continue;
             if ((sendret = mio_sendn(conn_sock, p->buf[i]->buf, p->buf[i]->cur_size)) >= 0) {
                 if (VERBOSE)
                     printf("Server send %d bytes to %d, (%d in buf)\n", 
