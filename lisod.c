@@ -11,25 +11,41 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <sys/fcntl.h>
+#include <signal.h>
+#include <errno.h>
 
 #include "mio.h"
 
-#define BUF_SIZE 4096
+#define BUF_SIZE 16
 #define MAX_SIZE_INFO 8 /* Max length of size info for the incomming msg */
 #define ARG_NUMBER 8   /* The number of argument lisod takes*/
-#define LISTENQ  1024  /* second argument to listen() */
+#define LISTENQ  20  /* second argument to listen() */
+
+
+
+typedef struct buff {
+    char *buf;    /* actually buf, dinamically allocated */
+    unsigned int cur_size; /* send size of this buf */
+    unsigned int size;     /* whole size of this buf */
+} Buff; 
 
 /** @brief The pool of fd that works with select()
  *
  */
-typedef struct {
+typedef struct pool {
     int maxfd;
     fd_set read_set;  /* The set of fd that Liso is looking at*/
     fd_set ready_set; /* The set of fd that is ready to recv */
+    fd_set write_set; /* The set of fd that Liso is looking at */
+    fd_set ready_write_set; /* The set of fd that is ready to write */
     int nready;       /* The # of fd that is ready to recv */
     int maxi;         /* The max fd */
     int client_sock[FD_SETSIZE]; /* array for client fd */
+    Buff *buf[FD_SETSIZE];
 } Pool;
+
+
 
 
 
@@ -38,7 +54,8 @@ void usage();
 int open_listen_socket(int port);
 void init_pool(int listen_sock, Pool *p);
 void add_client(int conn_sock, Pool *p);
-void serve_clients(Pool *p, int listen_sock);
+void serve_clients(Pool *p);
+void server_send(Pool *p);
 
 
 /** @brief Wrapper function for closing socket
@@ -46,6 +63,7 @@ void serve_clients(Pool *p, int listen_sock);
  *  @return 0 on sucess, 1 on error
  */ 
 int close_socket(int sock) {
+    printf("Close sock %d\n", sock);
     if (close(sock)) {
         fprintf(stderr, "Failed closing socket.\n");
         return 1;
@@ -82,35 +100,40 @@ int main(int argc, char* argv[]) {
     cgi = argv[6];
     pri_key = argv[7];
     cert = argv[8];
-    
 
-
+    signal(SIGPIPE, SIG_IGN);
 
     fprintf(stdout, "----- Echo Server -----\n");
     
     listen_sock = open_listen_socket(http_port);
     init_pool(listen_sock, &pool);
+    memset(&cli_addr, 0, sizeof(struct sockaddr));
+    memset(&cli_size, 0, sizeof(socklen_t));
     
     /* finally, loop waiting for input and then write it back */
     while (1) {
 
         pool.ready_set = pool.read_set;
-        pool.nready = select(pool.maxfd+1, &pool.ready_set, NULL, NULL, NULL);
+        pool.ready_write_set = pool.write_set;
+        printf("New select\n");
+        pool.nready = select(pool.maxfd+1, &pool.ready_set, &pool.ready_write_set, NULL, NULL);
 
         
         if (FD_ISSET(listen_sock, &pool.ready_set)) {
             
-            if ((client_sock = 
-                    accept(listen_sock, 
+            if ((client_sock = accept(listen_sock, 
                     (struct sockaddr *) &cli_addr, 
                     &cli_size)) == -1) {
                 close(listen_sock);
                 fprintf(stderr, "Error accepting connection.\n");
                 continue;
             }
+            fcntl(client_sock, F_SETFL, O_NONBLOCK);
             add_client(client_sock, &pool);
         } else {       
-            serve_clients(&pool, listen_sock);
+            serve_clients(&pool);
+            if (pool.nready)
+                server_send(&pool);
         }
     }
     close_socket(listen_sock);
@@ -183,11 +206,12 @@ void init_pool(int listen_sock, Pool *p) {
 
     p->maxfd = listen_sock;
     FD_ZERO(&p->read_set);
+    FD_ZERO(&p->write_set);
     FD_SET(listen_sock, &p->read_set);
 }
 
 /** @brief Add a new client fd
- *  @param conn_sock The socket of client to be addd
+ *  @param conn_sock The socket of client to be added
  *  @param p the pointer to the pool
  *  @return Void
  */
@@ -197,6 +221,11 @@ void add_client(int conn_sock, Pool *p) {
     for (i = 0; i < FD_SETSIZE; i++)
         if (p->client_sock[i] < 0) {
             p->client_sock[i] = conn_sock;
+
+            p->buf[i] = (Buff *)malloc(sizeof(Buff));
+            p->buf[i]->buf = (char *)malloc(BUF_SIZE);
+            p->buf[i]->cur_size = 0;
+            p->buf[i]->size = BUF_SIZE;
 
             FD_SET(conn_sock, &p->read_set);
 
@@ -210,87 +239,100 @@ void add_client(int conn_sock, Pool *p) {
     if (i == FD_SETSIZE) {
         fprintf(stderr, "Too many client.\n");        
         exit(EXIT_FAILURE);
-
     }
 }
 
-/** @brief A simple each server to the client
+/** @brief A simple echo server to the client
  *  @param listen_sock The socket on which the server is listenning
  *  @param p the pointer to the pool
  *  @return Void
  */
-void serve_clients(Pool *p, int listen_sock) {
+void serve_clients(Pool *p) {
     int conn_sock, i;
-    int size;
+    int keep_reading = 1;
     ssize_t readret;
-    char *buf;
-    char *msg_size[MAX_SIZE_INFO];
-
+    size_t buf_size;
+    printf("entering recv, nready = %d\n", p->nready);
     for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
         conn_sock = p->client_sock[i];
 
         if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_set))) {
             p->nready--;
-
-            if ((readret = mio_recvline(conn_sock, msg_size, MAX_SIZE_INFO))) {
-                msg_size[readret - 1] = '\0';
-                size = atoi((char *)msg_size);
-                if ((buf = malloc(size + readret)) == NULL) {
-                    fprintf(stderr, "serve_clients: malloc return NULL\n");
-                    if (close_socket(conn_sock)) {
-                        close_socket(listen_sock);
-                        fprintf(stderr, "Error closing client socket.\n");
-                        
-                    }
-                    FD_CLR(conn_sock, &p->read_set);
-                    p->client_sock[i] = -1;
-                    continue;
-                }
+            
+            while (keep_reading) {
+                buf_size = p->buf[i]->size - p->buf[i]->cur_size;
                 
-                memcpy(buf, msg_size, readret - 1);
-                buf[readret - 1] = '\n';
-                    
-            } else {
-                if (readret == 0)
-                    printf("serve_clients: socket %d hung up\n", conn_sock);
-                else
-                    fprintf(stderr, "serve_clients: recv return -1\n");
+                readret = recv(conn_sock, 
+                                (p->buf[i]->buf + p->buf[i]->cur_size), 
+                                buf_size, 0);
+                if (readret < buf_size)
+                    keep_reading = 0;
+
+                p->buf[i]->cur_size += readret;
+                //printf("receive 1 byte\n");
+                // if (p->buf[i]->cur_size >= (1 << 30)) {
+                //     fprintf(stderr, "serve_clients: Incomming msg is greater than 2^31 bytes\n");
+                //     if (close_socket(conn_sock)) {
+                //         fprintf(stderr, "Error closing client socket.\n");
+                //     }
+                //     FD_CLR(conn_sock, &p->read_set);
+                //     p->client_sock[i] = -1;
+                //     free(p->buf[i]->buf);
+                //     free(p->buf[i]);
+                //     p->buf[i] = NULL;
+                //     continue;
+                // }
+                if (p->buf[i]->cur_size >= (p->buf[i]->size / 2)) {
+                    p->buf[i]->buf = realloc(p->buf[i]->buf, p->buf[i]->size * 2);
+                    p->buf[i]->size *= 2;
+                }                                    
+            }
+            if (errno == EWOULDBLOCK)
+                printf("serve_clients: read all data, block prevented.\n");
+            else if (readret <= 0) {
+                fprintf(stderr, "serve_clients: recv return EOF or -1\n", errno);
                 if (close_socket(conn_sock)) {
-                    close_socket(listen_sock);
-                    fprintf(stderr, "Error closing client socket.\n");
+                    fprintf(stderr, "Error closing client socket.\n");                        
                 }
+                free(p->buf[i]->buf);
+                free(p->buf[i]);
                 FD_CLR(conn_sock, &p->read_set);
                 p->client_sock[i] = -1;
-                continue;
-                
+                p->buf[i] = NULL;
+                return;
             }
 
-            if ((readret += mio_recvn(conn_sock, buf + readret, size)) > 1) {
-                printf("Server received %d bytes data on %d\n", 
-                (int)readret, conn_sock);
+            FD_SET(conn_sock, &p->write_set);
+            printf("Server received %d bytes data on %d\n", 
+                (int)p->buf[i]->cur_size, conn_sock);
+            FD_CLR(conn_sock, &p->ready_set);
+        }
+    }
+}
 
-                if (mio_sendn(conn_sock, buf, readret) != readret) {
-                    close_socket(conn_sock);
-                    close_socket(listen_sock);
-                    fprintf(stderr, "Error sending to client.\n");
-                    exit(EXIT_FAILURE);
-                }
-                printf("Server sent %d bytes data to %d\n", 
-                       (int)readret, conn_sock);
-                free(buf);
+void server_send(Pool *p) {
+    int i, conn_sock;
+    ssize_t sendret;
+    printf("entering send, nready = %d\n", p->nready);
+
+    for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
+        conn_sock = p->client_sock[i];
+
+        if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_write_set))) {
+            p->nready--;
+            // if (p->buf[i]->cur_size == 0)
+            //     continue;
+            if ((sendret = mio_sendn(conn_sock, p->buf[i]->buf, p->buf[i]->cur_size)) >= 0) {
+                printf("Server send %d bytes to %d, (%d in buf)\n", 
+                    (int)sendret, conn_sock, p->buf[i]->cur_size);
             } else {
-                if (readret == 0) 
-                    printf("serve_clients: socket %d hung up\n", conn_sock);
-                else
-                    fprintf(stderr, "serve_clients: recv return -1\n");
                 if (close_socket(conn_sock)) {
-                    close_socket(listen_sock);
-                    fprintf(stderr, "Error closing client socket.\n");
-                                         
+                    fprintf(stderr, "Error closing client socket.\n");                        
                 }
-                FD_CLR(conn_sock, &p->read_set);
-                p->client_sock[i] = -1;
             }
+            
+            FD_CLR(conn_sock, &p->ready_write_set);
+            p->buf[i]->cur_size = 0;
         }
     }
 }
