@@ -21,6 +21,7 @@
 #define MAX_SIZE_INFO 8 /* Max length of size info for the incomming msg */
 #define ARG_NUMBER 8   /* The number of argument lisod takes*/
 #define LISTENQ  20  /* second argument to listen() */
+#define VERBOSE  0
 
 
 
@@ -115,7 +116,8 @@ int main(int argc, char* argv[]) {
 
         pool.ready_set = pool.read_set;
         pool.ready_write_set = pool.write_set;
-        printf("New select\n");
+        if (VERBOSE)
+            printf("New select\n");
         pool.nready = select(pool.maxfd+1, &pool.ready_set, &pool.ready_write_set, NULL, NULL);
 
         
@@ -252,7 +254,8 @@ void serve_clients(Pool *p) {
     int keep_reading = 1;
     ssize_t readret;
     size_t buf_size;
-    printf("entering recv, nready = %d\n", p->nready);
+    if (VERBOSE)
+        printf("entering recv, nready = %d\n", p->nready);
     for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
         conn_sock = p->client_sock[i];
 
@@ -303,8 +306,9 @@ void serve_clients(Pool *p) {
             }
 
             FD_SET(conn_sock, &p->write_set);
-            printf("Server received %d bytes data on %d\n", 
-                (int)p->buf[i]->cur_size, conn_sock);
+            if (VERBOSE)
+                printf("Server received %d bytes data on %d\n", 
+                    (int)p->buf[i]->cur_size, conn_sock);
             FD_CLR(conn_sock, &p->ready_set);
         }
     }
@@ -313,7 +317,8 @@ void serve_clients(Pool *p) {
 void server_send(Pool *p) {
     int i, conn_sock;
     ssize_t sendret;
-    printf("entering send, nready = %d\n", p->nready);
+    if (VERBOSE)
+        printf("entering send, nready = %d\n", p->nready);
 
     for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
         conn_sock = p->client_sock[i];
@@ -323,8 +328,9 @@ void server_send(Pool *p) {
             // if (p->buf[i]->cur_size == 0)
             //     continue;
             if ((sendret = mio_sendn(conn_sock, p->buf[i]->buf, p->buf[i]->cur_size)) >= 0) {
-                printf("Server send %d bytes to %d, (%d in buf)\n", 
-                    (int)sendret, conn_sock, p->buf[i]->cur_size);
+                if (VERBOSE)
+                    printf("Server send %d bytes to %d, (%d in buf)\n", 
+                        (int)sendret, conn_sock, p->buf[i]->cur_size);
             } else {
                 if (close_socket(conn_sock)) {
                     fprintf(stderr, "Error closing client socket.\n");                        
