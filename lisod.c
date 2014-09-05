@@ -264,13 +264,15 @@ void serve_clients(Pool *p) {
             while (1) {
                 buf_size = p->buf[i]->size - p->buf[i]->cur_size;
                 
-                readret = recv(conn_sock, 
+                if ((readret = recv(conn_sock, 
                                 (p->buf[i]->buf + p->buf[i]->cur_size), 
-                                buf_size, 0);
-                if (readret < buf_size)
+                                buf_size, 0)) == -1)
                     break;
+                
 
                 p->buf[i]->cur_size += readret;
+                if (readret < buf_size)
+                    break;
                 //printf("receive 1 byte\n");
                 // if (p->buf[i]->cur_size >= (1 << 30)) {
                 //     fprintf(stderr, "serve_clients: Incomming msg is greater than 2^31 bytes\n");
@@ -287,7 +289,8 @@ void serve_clients(Pool *p) {
                 if (p->buf[i]->cur_size >= (p->buf[i]->size / 2)) {
                     p->buf[i]->buf = realloc(p->buf[i]->buf, p->buf[i]->size * 2);
                     p->buf[i]->size *= 2;
-                }                                    
+                }           
+
             }
             if (errno == EWOULDBLOCK)
                 printf("serve_clients: read all data, block prevented.\n");
@@ -323,7 +326,7 @@ void server_send(Pool *p) {
         conn_sock = p->client_sock[i];
 
         if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_write_set))) {
-            p->nready--;
+            
             if (p->buf[i]->cur_size == 0)
                 continue;
             if ((sendret = mio_sendn(conn_sock, p->buf[i]->buf, p->buf[i]->cur_size)) >= 0) {
