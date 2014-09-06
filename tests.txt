@@ -1,0 +1,75 @@
+################################################################################
+# TESTS                                                                        #
+#                                                                              #
+# Description: This file describes the test methods for Checkpoint1.           #
+#                                                                              #
+# Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
+#                                                                              #
+################################################################################
+
+
+
+[TOC-1] Table of Contents
+--------------------------------------------------------------------------------
+
+        [TOC-1] Table of Contents
+        [CKP-1] Description of Test Cases for Checkpoint 1
+
+[CKP-1] Description of Test Cases for Checkpoint 1
+--------------------------------------------------------------------------------
+
+1. Test for single echo client
+I use the echo_client to test signle echo functionality
+
+Open two terminals and excute the following command in the first terminal
+Note that I implemented all 8 arugments but only the first one, the HTTP port, is
+working.
+
+                   ./lisod 9999 <HTTPS port> <log file> \
+      				<lock file> <www folder> <CGI script path> \ 
+      				<private key file> <certificate file>
+
+And the following command on the other terminal
+
+                   ./echo_client 127.0.0.1 9999
+
+After this, I should be able to type any characters on the stdin and get the exact
+characters echoed back on stdout.
+
+
+2. Test for concurrent echo clients
+I use the the python script to test concurrent echo functionality
+
+Open two terminals and excute the following command in the first terminal
+                   
+                   ./lisod 9999 <HTTPS port> <log file> \
+      				<lock file> <www folder> <CGI script path> \ 
+      				<private key file> <certificate file>
+
+And the following command on the other terminal
+
+                   ./cp1_checker 127.0.0.1 9999 1000 10 2048 500
+
+By using the python script, I could be able set up arbitrary number of trails 
+and connections as well as the max bytes to test for each echo. I used the script
+in different arguments.
+
+
+3. Test for random errors
+I use the the python script to test this
+
+Open two terminals and excute the following command in the first terminal
+                   
+                   ./lisod 9999 <HTTPS port> <log file> \
+      				<lock file> <www folder> <CGI script path> \ 
+      				<private key file> <certificate file>
+
+And the following command on the other terminal
+
+                   ./cp1_checker 127.0.0.1 9999 2000 500 20 500
+
+I repeatedly excute the above python scprit several times, each time I randomly send
+Ctrl + C to the shell that is excuting the script to see if the server crash.
+
+
+

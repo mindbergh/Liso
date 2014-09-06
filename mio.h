@@ -1,9 +1,12 @@
-/* $begin mio.h */
 #ifndef MIO_H
 #define MIO_H
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <stdio.h>
 
-#define MIO_BUFSIZE 8192
 
 
 

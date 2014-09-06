@@ -1,7 +1,7 @@
 ################################################################################
 # Makefile                                                                     #
 #                                                                              #
-# Description: This file contains the make rules for Recitation 1.             #
+# Description: This file contains the make rules for checkpoint 1.             #
 #                                                                              #
 # Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
 #                                                                              #
@@ -29,7 +29,7 @@ echo_client: echo_client.o
 
 
 handin:
-	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude cp1_checker.py)
+	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude cp1_checker.py --exclude README)
 
 
 clean:

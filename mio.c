@@ -1,20 +1,16 @@
 /** @file mio.c                                                               *
- *  @brief The Mio I/O package                                                                          *
+ *  @brief The Ming I/O package                                                                          *
  *  @author Ming Fang - mingf@cs.cmu.edu
  *  @bug I am finding
  */
 
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <errno.h>
-#include <stdio.h>
+#include "mio.h"
 
 /** @brief Receive n bytes from a socket
- *  @param
- *  @param
- *  @param
- *  @return
+ *  @param fd The socket to recv from
+ *  @param usrbuf the buff pointer
+ *  @param n the max number of bytes to receive
+ *  @return -1 on error or the number of bytes received
  */
 ssize_t mio_recvn(int fd, void *usrbuf, size_t n) {
     size_t nleft = n;
@@ -30,8 +26,7 @@ ssize_t mio_recvn(int fd, void *usrbuf, size_t n) {
                 return 0;
             } else
                 return -1;      /* errno set by read() */
-        }
-        else if (nrecv == 0)
+        } else if (nrecv == 0)
             break;              /* EOF */
         nleft -= nrecv;
         bufp += nrecv;
@@ -41,10 +36,10 @@ ssize_t mio_recvn(int fd, void *usrbuf, size_t n) {
 
 
 /** @brief Send n bytes to a socket
- *  @param
- *  @param
- *  @param
- *  @return
+ *  @param fd The socket to send to
+ *  @param usrbuf the buff pointer
+ *  @param n the max number of bytes to receive
+ *  @return -1 on error or the number of bytes sent
  */
 ssize_t mio_sendn(int fd, void *usrbuf, size_t n) {
     size_t nleft = n;
@@ -67,10 +62,10 @@ ssize_t mio_sendn(int fd, void *usrbuf, size_t n) {
 }
 
 /** @brief Receive a line from a socket
- *  @param
- *  @param
- *  @param
- *  @return
+ *  @param fd The socket to recv from
+ *  @param usrbuf buf pointer
+ *  @param maxlen the max length of the line
+ *  @return -1 on error or the number of bytes received
  */
 ssize_t mio_recvline(int fd, void *usrbuf, size_t maxlen)
 {

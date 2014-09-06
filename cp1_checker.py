@@ -24,13 +24,12 @@ socketList = []
 RECV_TOTAL_TIMEOUT = 0.1
 RECV_EACH_TIMEOUT = 0.01
 
-
+a = time.time()
 for i in xrange(numConnections):
     s = socket(AF_INET, SOCK_STREAM)
     s.connect((serverHost, serverPort))
     socketList.append(s)
-
-
+    
 for i in xrange(numTrials):
     socketSubset = []
     randomData = []

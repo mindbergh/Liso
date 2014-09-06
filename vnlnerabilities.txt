@@ -1,0 +1,25 @@
+################################################################################
+# Vulnerabilities                                                              #
+#                                                                              #
+# Description: This file describes the vnlnerabilities for each stage.         #
+#                                                                              #
+# Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
+#                                                                              #
+################################################################################
+
+
+
+[TOC-1] Table of Contents
+--------------------------------------------------------------------------------
+
+        [TOC-1] Table of Contents
+        [CKP-1] Description of Vnlnerabilities for Checkpoint 1
+
+
+[CKP-1] Description of Vnlnerabilities for Checkpoint 1
+--------------------------------------------------------------------------------
+1. My implementation does not constrain the maximum number of connections each
+   one client can establish. If certain client keeps connecting and sending 
+   random data, other clients may not be able to get chance to get services.
+2. The maximum number of connection is 1024, if a clinet requests more than 
+   1024 connections, the server will crash.
