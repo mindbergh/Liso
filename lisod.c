@@ -1,5 +1,5 @@
-/** @file lisod.c                                                               *
- *  @brief This is a select()-based echo server                                                                          *
+/** @file lisod.c          
+ *  @brief This is a select()-based echo server
  *  @auther Ming Fang - mingf@cs.cmu.edu
  *  @bug I am finding
  */
@@ -29,7 +29,8 @@
  *
  */
 typedef struct buff {
-    char *buf;    /* actually buf, dinamically allocated */
+    char *buf;    /* actual buf, dinamically allocated */
+    int fd;        /* client fd */
     unsigned int cur_size; /* current used size of this buf */
     unsigned int size;     /* whole size of this buf */
 } Buff; 
@@ -47,7 +48,7 @@ typedef struct pool {
     int cur_conn;     /* The current number of established connection */
     int maxi;         /* The max fd */
     int client_sock[FD_SETSIZE]; /* array for client fd */
-    Buff *buf[FD_SETSIZE];
+    Buff *buf[FD_SETSIZE];    /* array of points to buff */
 } Pool;
 
 
@@ -224,7 +225,7 @@ void init_pool(int listen_sock, Pool *p) {
     int i;
     p->maxi = -1;
     for (i = 0; i < FD_SETSIZE; i++)
-        p->client_sock[i] = -1;
+        p->buf[i] = NULL;
 
     p->maxfd = listen_sock;
     p->cur_conn = 0;
@@ -243,13 +244,13 @@ void add_client(int conn_sock, Pool *p) {
     p->cur_conn++;
     p->nready--;
     for (i = 0; i < FD_SETSIZE; i++)
-        if (p->client_sock[i] < 0) {
-            p->client_sock[i] = conn_sock;
+        if (p->buf[i] == NULL) {
 
             p->buf[i] = (Buff *)malloc(sizeof(Buff));
             p->buf[i]->buf = (char *)malloc(BUF_SIZE);
             p->buf[i]->cur_size = 0;
             p->buf[i]->size = BUF_SIZE;
+            p->buf[i]->fd = conn_sock;
 
             FD_SET(conn_sock, &p->read_set);
 
@@ -278,9 +279,12 @@ void serve_clients(Pool *p) {
         printf("entering recv, nready = %d\n", p->nready);
 
     for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
-        conn_sock = p->client_sock[i];
+        if (p->buf[i] == NULL)
+            continue;
 
-        if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_read))) {
+        conn_sock = p->buf[i]->fd;
+
+        if (FD_ISSET(conn_sock, &p->ready_read)) {
             p->nready--;
             
             while (1) { /* Keep recv, until -1 or short recv encountered */
@@ -303,7 +307,6 @@ void serve_clients(Pool *p) {
                         fprintf(stderr, "Error closing client socket.\n");
                     }
                     FD_CLR(conn_sock, &p->read_set);
-                    p->client_sock[i] = -1;
                     p->cur_conn--;
                     free(p->buf[i]->buf);
                     free(p->buf[i]);
@@ -318,14 +321,14 @@ void serve_clients(Pool *p) {
                     p->buf[i]->size *= 2;
                 }
             }
-            if (p->client_sock[i] == -1) /* max buff size occured */
+            if (p->buf[i] == NULL) /* max buff size reached */
                 continue;
 
-            if (errno == EWOULDBLOCK) { /* Finish recv, would have block */
+            if (readret == -1 && errno == EWOULDBLOCK) { /* Finish recv, would have block */
                 if (VERBOSE)
                     printf("serve_clients: read all data, block prevented.\n");
             } else if (readret <= 0) {
-                fprintf(stderr, "serve_clients: readret = %d\n", readret);
+                printf("serve_clients: readret = %d\n", readret);
                 if (close_socket(conn_sock)) {
                     fprintf(stderr, "Error closing client socket.\n");                        
                 }
@@ -333,7 +336,6 @@ void serve_clients(Pool *p) {
                 free(p->buf[i]->buf);
                 free(p->buf[i]);
                 FD_CLR(conn_sock, &p->read_set);
-                p->client_sock[i] = -1;
                 p->buf[i] = NULL;
                 return;
             }
@@ -361,9 +363,11 @@ void server_send(Pool *p) {
     for (i = 0; (i <= p->maxi) && (p->nready > 0); i++) {
         /* Go thru all pool unit to see if it is a vaild socket 
            and is available to write */
-        conn_sock = p->client_sock[i];
+        if (p->buf[i] == NULL)
+            continue;
+        conn_sock = p->buf[i]->fd;
 
-        if ((conn_sock > 0) && (FD_ISSET(conn_sock, &p->ready_write))) {
+        if (FD_ISSET(conn_sock, &p->ready_write)) {
             
             if (p->buf[i]->cur_size == 0)  /* Skip if this buf is empty */
                 continue;
@@ -374,18 +378,21 @@ void server_send(Pool *p) {
                 if (VERBOSE)
                     printf("Server send %d bytes to %d, (%d in buf)\n", 
                         (int)sendret, conn_sock, p->buf[i]->cur_size);
+                p->buf[i]->cur_size = 0;
             } else {
                 if (close_socket(conn_sock)) {
                     fprintf(stderr, "Error closing client socket.\n");                        
                 }
                 p->cur_conn--;
+                free(p->buf[i]->buf);
+                free(p->buf[i]);
+                FD_CLR(conn_sock, &p->read_set);
+                p->buf[i] = NULL;
             }
 
             /* Remove it from write set, since server has sent all data
                for this particular socket */
-            FD_CLR(conn_sock, &p->write_set);
-
-            p->buf[i]->cur_size = 0;
+            FD_CLR(conn_sock, &p->write_set);            
         }
     }
 }
@@ -398,14 +405,13 @@ void server_send(Pool *p) {
 void clean_state(Pool *p, int listen_sock) {
     int i, conn_sock;
     for (i = 0; i <= p->maxi; i++) {
-        conn_sock = p->client_sock[i];
-        if (conn_sock > 0) {
+        if (p->buf[i]) {
+            conn_sock = p->buf[i]->fd;
             if (close_socket(conn_sock)) {
                 fprintf(stderr, "Error closing client socket.\n");                        
             }   
             p->cur_conn--;
             FD_CLR(conn_sock, &p->read_set);
-            p->client_sock[i] = -1;
             free(p->buf[i]->buf);
             free(p->buf[i]);
             p->buf[i] = NULL;                               
@@ -413,4 +419,5 @@ void clean_state(Pool *p, int listen_sock) {
     }
     p->maxi = -1;
     p->maxfd = listen_sock;
+    p->cur_conn = 0;
 }
