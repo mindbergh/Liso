@@ -24,32 +24,7 @@
 #define VERBOSE       1    /* Whether to print out debug infomations */
 
 
-/** @brief The buff struct that keeps track of current 
- *         used size and whole size
- *
- */
-typedef struct buff {
-    char *buf;    /* actual buf, dinamically allocated */
-    int fd;        /* client fd */
-    unsigned int cur_size; /* current used size of this buf */
-    unsigned int size;     /* whole size of this buf */
-} Buff; 
 
-/** @brief The pool of fd that works with select()
- *
- */
-typedef struct pool {
-    int maxfd;
-    fd_set read_set; /* The set of fd Liso is looking at before recving */
-    fd_set ready_read; /* The set of fd that is ready to recv */
-    fd_set write_set; /* The set of fd Liso is looking at before sending*/
-    fd_set ready_write; /* The set of fd that is ready to write */
-    int nready;       /* The # of fd that is ready to recv or send */
-    int cur_conn;     /* The current number of established connection */
-    int maxi;         /* The max fd */
-    int client_sock[FD_SETSIZE]; /* array for client fd */
-    Buff *buf[FD_SETSIZE];    /* array of points to buff */
-} Pool;
 
 
 
@@ -372,9 +347,7 @@ void server_send(Pool *p) {
             if (p->buf[i]->cur_size == 0)  /* Skip if this buf is empty */
                 continue;
 
-            if ((sendret = mio_sendn(conn_sock, 
-                                    p->buf[i]->buf, 
-                                    p->buf[i]->cur_size)) > 0) {
+            if (sendret = mio_sendn(p->buf[i]) > 0) {
                 if (VERBOSE)
                     printf("Server send %d bytes to %d, (%d in buf)\n", 
                         (int)sendret, conn_sock, p->buf[i]->cur_size);
