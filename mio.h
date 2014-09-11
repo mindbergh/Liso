@@ -12,10 +12,12 @@
  *
  */
 typedef struct buff {
+    
     char *buf;    /* actual buf, dinamically allocated */
     int fd;        /* client fd */
     unsigned int cur_size; /* current used size of this buf */
     unsigned int size;     /* whole size of this buf */
+
 } Buff; 
 
 /** @brief The pool of fd that works with select()

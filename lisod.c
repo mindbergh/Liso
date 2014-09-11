@@ -16,6 +16,7 @@
 #include <errno.h>
 
 #include "mio.h"
+#include "http_parser.h"
 
 #define BUF_SIZE      16   /* Initial buff size */
 #define MAX_SIZE_INFO 8    /* Max length of size info for the incomming msg */
