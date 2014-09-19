@@ -9,28 +9,69 @@
 
 
 
-CFLAGS = -Wall -g  -Wextra
+# CFLAGS = -Wall -g  -Wextra
+# CC = gcc
+
+# all: lisod echo_client
+
+# mio.o: mio.c mio.h
+# 	$(CC) $(CFLAGS) -c mio.c
+
+# loglib.o: loglib.c loglib.h
+# 	$(CC) $(CFLAGS) -c loglib.c
+
+# echo_client.o: echo_client.c
+# 	$(CC) $(CFLAGS) -c echo_client.c
+
+# lisod.o: lisod.c
+# 	$(CC) $(CFLAGS) -c lisod.c
+
+# lisod: lisod.o mio.o
+
+# echo_client: echo_client.o 
+
+
+# handin:
+# 	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude cp1_checker.py --exclude README)
+
+
+# clean:
+# 	rm -f *~ *.o lisod echo_client
+
+
+CFLAGS = -Wall -g 
 CC = gcc
 
-all: lisod echo_client
+objects = loglib.o mio.o lisod.o
 
+default: lisod
+
+.PHONY: default clean clobber handin
+
+lisod: $(objects)
+	$(CC) -o $@ $^
+
+lisod.o: lisod.c mio.h loglib.h
 mio.o: mio.c mio.h
-	$(CC) $(CFLAGS) -c mio.c
+loglib.o: loglib.c loglib.h mio.h
+loglib_test.o: loglib_test.c loglib.h mio.h
 
-echo_client.o: echo_client.c
-	$(CC) $(CFLAGS) -c echo_client.c
+%.o: %.c
+	$(CC) -c $(CFLAGS) -o $@ $<
 
-lisod.o: lisod.c
-	$(CC) $(CFLAGS) -c lisod.c
 
-lisod: lisod.o mio.o
+loglib_test: loglib_test.o loglib.o loglib.h mio.o mio.h
+	${CC} loglib.o loglib_test.o mio.o -o $@
 
-echo_client: echo_client.o 
 
+clean:
+	rm -f $(objects)
+
+clobber: clean
+	rm -f lisod
 
 handin:
 	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude cp1_checker.py --exclude README)
 
 
-clean:
-	rm -f *~ *.o lisod echo_client
+

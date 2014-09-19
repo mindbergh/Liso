@@ -23,6 +23,10 @@
 *.hex
 lisod
 echo_client
+loglib_test
+
+#test
+static_site
 
 # Old file
 MakefileOld
