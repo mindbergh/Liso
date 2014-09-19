@@ -44,6 +44,7 @@ CC = gcc
 
 objects = loglib.o mio.o lisod.o
 
+
 default: lisod
 
 .PHONY: default clean clobber handin
@@ -65,13 +66,13 @@ loglib_test: loglib_test.o loglib.o loglib.h mio.o mio.h
 
 
 clean:
-	rm -f $(objects)
+	rm -f  loglib.o mio.o lisod.o echo_client.o loglib_test.o lisod loglib_test echo_client
 
 clobber: clean
 	rm -f lisod
 
 handin:
-	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude cp1_checker.py --exclude README)
+	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude cp1_checker.py --exclude README --exclude static_site --exclude dumper.py --exclude liso_prototype.py --exclude http_parser.h)
 
 
 
