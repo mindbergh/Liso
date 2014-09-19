@@ -535,15 +535,14 @@ void server_send(Pool *p) {
                         close_conn(p, i);
                         continue;
                     }
-                } else {
-                    close_conn(p, i);
-                    continue;
                 }
+                
                 req->valid = REQ_INVALID;
                 req = req->next;
             }
             if (bufi->stage == STAGE_ERROR || bufi->stage == STAGE_CLOSE) {
                 close_conn(p, i);
+
             }
 
 
@@ -641,10 +640,10 @@ void clienterror(FILE *fd, Requests *req, char *addr, char *cause, char *errnum,
 
      /* Print the HTTPS response */
     sprintf(hdr, "HTTP/1.1 %s %s\r\n", errnum, shortmsg);
-    sprintf(hdr, "Content-Type: text/html\r\n");
-    sprintf(hdr, "Connection: close\r\n");
-    sprintf(hdr, "Date: %s\r\n", date);
-    sprintf(hdr, "Content-Length: %d\r\n\r\n%s", (int)strlen(body), body);
+    sprintf(hdr, "%sContent-Type: text/html\r\n",hdr);
+    sprintf(hdr, "%sConnection: close\r\n",hdr);
+    sprintf(hdr, "%sDate: %s\r\n",hdr, date);
+    sprintf(hdr, "%sContent-Length: %d\r\n\r\n%s",hdr, (int)strlen(body), body);
     len = strlen(hdr);
     req->response = (char *)malloc(len + 1);
     sprintf(req->response, "%s", hdr);
