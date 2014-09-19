@@ -22,7 +22,6 @@
 #include <arpa/inet.h>
 
 #include "mio.h"
-#include "http_parser.h"
 #include "loglib.h"
 
 #define BUF_SIZE      8192   /* Initial buff size */
