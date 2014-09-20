@@ -529,10 +529,11 @@ void server_send(Pool *p) {
                 if (req->body != NULL) {
                     if ((sendret = mio_sendn(conn_sock, req->body, req->body_size)) > 0) {
                         if (VERBOSE)
-                            printf("Server send body bytes to %d\n", conn_sock);
+                            printf("Server send %d bytes to %d\n",sendret, conn_sock);
                         munmap(req->body, req->body_size);
                         req->body = NULL;
                     } else {
+                        
                         close_conn(p, i);
                         req = req->next;
                         continue;

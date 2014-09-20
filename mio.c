@@ -26,7 +26,12 @@ ssize_t mio_sendn(int fd, char *ubuf, size_t n) {
 		else if (errno == EPIPE) {
 			fprintf(stderr, "EPIPE handled\n");
 			return nsend;
-		} else return -1;       /* errorno set by send() */
+		} else if (errno == EAGAIN) {
+			nsend = 0;
+		} else {
+			printf("send error on %s\n", strerror(errno));
+			return -1;       /* errorno set by send() */
+		}
 	}
 	nleft -= nsend;
 	buf += nsend;

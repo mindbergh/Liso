@@ -66,7 +66,7 @@ loglib_test: loglib_test.o loglib.o loglib.h mio.o mio.h
 
 
 clean:
-	rm -f  loglib.o mio.o lisod.o echo_client.o loglib_test.o lisod loglib_test echo_client
+	rm -f  loglib.o mio.o lisod.o echo_client.o loglib_test.o lisod loglib_test echo_client log
 
 clobber: clean
 	rm -f lisod
