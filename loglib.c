@@ -12,7 +12,7 @@ FILE * log_init(char *log_file) {
 
 
 void log_write(FILE *fp, Requests *req, char *addr, char *date, char *status, int size) {
-	printf("Logged!!!!\n");
+	//printf("Logged!!!!\n");
 	fprintf(fp, "%s [%s] \"%s %s %s\" %s %d\n", addr,
 	                                            date, 
 	                                            req->method, 

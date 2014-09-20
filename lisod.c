@@ -28,7 +28,7 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       1    /* Whether to print out debug infomations */
+#define VERBOSE       0    /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
 
@@ -536,7 +536,7 @@ void server_send(Pool *p) {
                         continue;
                     }
                 }
-                
+
                 req->valid = REQ_INVALID;
                 req = req->next;
             }
@@ -669,7 +669,7 @@ int read_requesthdrs(Buff *b, Requests *req) {
     if (VERBOSE)
         printf("entering read request:\n%s", buf);
 
-    printf("%d\n", strcmp(buf, "\r\n"));
+    //printf("%d\n", strcmp(buf, "\r\n"));
 
     while (1) {
         buf += len;
