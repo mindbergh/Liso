@@ -521,6 +521,7 @@ void server_send(Pool *p) {
                     
                 } else {
                     close_conn(p, i);
+                    req = req->next;
                     continue;
 
                 }
@@ -533,6 +534,7 @@ void server_send(Pool *p) {
                         req->body = NULL;
                     } else {
                         close_conn(p, i);
+                        req = req->next;
                         continue;
                     }
                 }
@@ -542,7 +544,6 @@ void server_send(Pool *p) {
             }
             if (bufi->stage == STAGE_ERROR || bufi->stage == STAGE_CLOSE) {
                 close_conn(p, i);
-
             }
 
 
@@ -774,6 +775,8 @@ char * get_header(Requests * req, char *key) {
 
 
 void close_conn(Pool *p, int i) {
+    //if (p->buf[i] == NULL)
+        //return;
     int conn_sock = p->buf[i]->fd;
     if (close_socket(conn_sock)) {
         fprintf(stderr, "Error closing client socket.\n");                        
