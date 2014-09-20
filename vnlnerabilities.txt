@@ -14,6 +14,7 @@
 
         [TOC-1] Table of Contents
         [CKP-1] Description of Vnlnerabilities for Checkpoint 1
+        [CKP-2] Description of Vnlnerabilities for Checkpoint 2
 
 
 [CKP-1] Description of Vnlnerabilities for Checkpoint 1
@@ -23,3 +24,10 @@
    random data, other clients may not be able to get chance to get services.
 2. The maximum number of connection is 1024, if a clinet requests more than 
    1024 connections, the server will crash.
+
+
+[CKP-1] Description of Vnlnerabilities for Checkpoint 1
+--------------------------------------------------------------------------------
+1. The send operation implemetned in my Liso server will try again to send files 
+   when EAGAIN is encountered no matter how large the file is. This would potentially
+   block the server. 

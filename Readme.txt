@@ -14,12 +14,12 @@
 --------------------------------------------------------------------------------
 
         [TOC-1] Table of Contents
-        [DES-2] Description of Design
-        [DES-3] Description of Files
-        [RUN-4] How to Run
+        [DES-2] Description of Design for checkpoint1
+        [DES-3] Description of Files for checkpoint1
+        [DES-4] Description of Design for checkpoint2
+        [DES-5] Description of Files for checkpoint2
 
-
-[DES-2] Description of Design
+[DES-2] Description of Design for checkpoint1
 --------------------------------------------------------------------------------
 This is a server called Liso, which is a selec()-based server that 
 implements echo service.
@@ -38,7 +38,7 @@ The maximum number of connection if 1024, server will exit once the number of
 established sockets reaches 1024.
 
 
-[DES-2] Description of Files
+[DES-2] Description of Files for checkpoint1
 --------------------------------------------------------------------------------
 
 Here is a listing of all files associated with Recitation 1 and what their
@@ -53,3 +53,42 @@ purpose is:
         .../tests.txt           - your test cases and any known issues you have
         .../vulnerabilities.ext - The vulnerabilities for my impementation
 
+
+
+[DES-2] Description of Design for checkpoint2
+--------------------------------------------------------------------------------
+This is a server called Liso, which is a selec()-based server that 
+implements GET, POST, HEAD http requests.
+
+The Liso server responses minimally contain the following header:
+        Content-Length
+        Content-Type
+        Last-Modified
+        
+The Liso server responses        
+200_OK                         if everything is fine
+404_NOT_FOUND                  if objects do not exist in the file system
+411_LENGTH_REQUIRED            if for POST requests do not contain Content-Length
+501_NOT_IMPLEMENTED            if request methods are other than GET POST HEAD 
+505_HTTP_VERSION_NOT_SUPPORTED if the requests are other than 1.1
+
+
+The maximum number of connection if 1024, server will exit once the number of 
+established sockets reaches 1024.
+
+
+[DES-2] Description of Files for checkpoint2
+--------------------------------------------------------------------------------
+
+Here is a listing of all files associated with Recitation 1 and what their
+purposes are:
+
+        .../Readme.txt          - Current document 
+        .../lisod.c             - Liso echo server
+        .../mio.c               - C file for IO functions
+        .../mio.h               - Header for IO functions
+        .../loglib.c            - C file for log related functions
+        .../loglib.h            - Header for log related functions
+        .../Makefile            - Contains rules for make
+        .../tests.txt           - your test cases and any known issues you have
+        .../vulnerabilities.ext - The vulnerabilities for my impementation

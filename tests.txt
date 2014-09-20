@@ -14,6 +14,8 @@
 
         [TOC-1] Table of Contents
         [CKP-1] Description of Test Cases for Checkpoint 1
+        [CKP-2] Description of Test Cases for Checkpoint 2
+
 
 [CKP-1] Description of Test Cases for Checkpoint 1
 --------------------------------------------------------------------------------
@@ -71,5 +73,27 @@ And the following command on the other terminal
 I repeatedly excute the above python scprit several times, each time I randomly send
 Ctrl + C to the shell that is excuting the script to see if the server crash.
 
+
+
+[CKP-2] Description of Test Cases for Checkpoint 2
+--------------------------------------------------------------------------------
+
+1. Test for single valid request
+Telnet to Liso and send valid request
+
+2. Test for single invalid requests
+Telnet to Liso and send invalid requests including methods other than "GET", "POST", 
+"HEAD". HTTP version other than "HTTP/1.1", URIs that do not match any exsit files.
+
+3. Test for browser
+Request pages by using firefox and check if the pages successfully load and check if
+all headers of responses are correct.
+
+4. Test for huge file
+Doweload a file of 120MB by browser and check if its md5 matches the original file.
+
+5. Test for concurrency
+Using apache bench to perform 100,000 requests with concurrency level 1019.
+ab -k -n 1000000 -c 1019 -t 20 http://127.0.0.1:port/
 
 
