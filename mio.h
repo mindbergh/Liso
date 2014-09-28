@@ -20,6 +20,7 @@
 
 #define REQ_VALID               1
 #define REQ_INVALID             0
+#define REQ_PIPE                2
 
 
 typedef struct headers {
@@ -34,8 +35,11 @@ typedef struct requests {
     char *version;
     Headers *header;
     int valid;
-    char *response;
-    char *body; 
+    char *response;  /* response header */
+    char *body;    /* response body*/ 
+    char *post_body; /* request post body */
+    int pipefd;       /* fd from which to read cgi result */
+    int post_body_length;
     int body_size;
     struct requests *next;
 } Requests;
@@ -47,8 +51,9 @@ typedef struct requests {
  */
 typedef struct buff {
     char addr[INET_ADDRSTRLEN];  /* client ip address */
-    char *buf;    /* actual buf, dinamically allocated */
-    int fd;        /* client fd */ 
+    char *buf;    /* actual buf, dynamically allocated */
+    int fd;        /* client fd */
+    int port; 
     unsigned int cur_size; /* current used size of this buf */
     unsigned int cur_parsed;
     unsigned int size;     /* whole size of this buf */
@@ -68,11 +73,13 @@ typedef struct pool {
     fd_set ready_write; /* The set of fd that is ready to write */
     int nready;       /* The # of fd that is ready to recv or send */
     int cur_conn;     /* The current number of established connection */
-    int maxi;         /* The max fd */
+    int maxi;         /* The max index of fd */
+    int maxi_pipes;    /* The max index uesd in pipes */
     int client_sock[FD_SETSIZE]; /* array for client fd */
     FILE *logfd;
     char *www;
-
+    char *cgi;
+    int pipes[FD_SETSIZE];    /* array of cgi pips */
     Buff *buf[FD_SETSIZE];    /* array of points to buff */
 } Pool;
 
@@ -80,6 +87,7 @@ typedef struct pool {
 
 /* Mio (Ming I/O) package */
 ssize_t mio_sendn(int fd, char *ubuf, size_t n);
+ssize_t mio_readn(int fd, char *buf, size_t n);
 ssize_t mio_recvlineb(int fd, void *usrbuf, size_t maxlen);
 
 #endif

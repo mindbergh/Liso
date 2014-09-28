@@ -28,7 +28,7 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       0    /* Whether to print out debug infomations */
+#define VERBOSE       1    /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
 
@@ -44,7 +44,7 @@
 void usage();
 int open_listen_socket(int port);
 void init_pool(int listen_sock, Pool *p);
-void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr);
+void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port);
 void serve_clients(Pool *p);
 void server_send(Pool *p);
 void clean_state(Pool *p, int listen_sock);
@@ -64,6 +64,7 @@ void serve_static(FILE *fd, Buff *b, char *filename, struct stat sbuf);
 void put_req(Requests *req, char *method, char *uri, char *version);
 int is_valid_method(char *method);
 char *get_hdr_value_by_key(Headers *hdr, char *key);
+int isnumeric(char *str);
 
 /** @brief Wrapper function for closing socket
  *  @param sock The socket fd to be closed
@@ -105,15 +106,20 @@ int main(int argc, char* argv[]) {
     log_file = argv[3];
     lock_file = argv[4];
     pool.www = argv[5];
-    cgi = argv[6];
+    pool.cgi = argv[6];
     pri_key = argv[7];
     cert = argv[8];
 
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGCHLD, SIG_IGN);
 
     fprintf(stdout, "----- Echo Server -----\n");
     
     listen_sock = open_listen_socket(http_port);
+
+    if (VERBOSE)
+        printf("listen = %d", listen_sock);
+
     init_pool(listen_sock, &pool);
     pool.logfd = log_init(log_file);
     memset(&cli_addr, 0, sizeof(struct sockaddr));
@@ -141,7 +147,7 @@ int main(int argc, char* argv[]) {
 
         
         if (FD_ISSET(listen_sock, &pool.ready_read) && 
-                    pool.cur_conn <= FD_SETSIZE) {
+                     pool.cur_conn <= FD_SETSIZE) {
             
             if ((client_sock = accept(listen_sock, 
                                     (struct sockaddr *) &cli_addr, 
@@ -152,8 +158,9 @@ int main(int argc, char* argv[]) {
             }
             if (VERBOSE)
                 printf("New client %d accepted\n", client_sock);
+
             fcntl(client_sock, F_SETFL, O_NONBLOCK);
-            add_client(client_sock, &pool, (struct sockaddr_in *) &cli_addr);
+            add_client(client_sock, &pool, (struct sockaddr_in *) &cli_addr, http_port);
         }
         serve_clients(&pool);
         if (pool.nready)
@@ -225,8 +232,10 @@ int open_listen_socket(int port) {
 void init_pool(int listen_sock, Pool *p) {
     int i;
     p->maxi = -1;
-    for (i = 0; i < FD_SETSIZE; i++)
+    for (i = 0; i < FD_SETSIZE; i++) {
         p->buf[i] = NULL;
+        p->pipes[i] = -1;
+    }
 
     p->maxfd = listen_sock;
     p->cur_conn = 0;
@@ -240,7 +249,7 @@ void init_pool(int listen_sock, Pool *p) {
  *  @param p the pointer to the pool
  *  @return Void
  */
-void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr) {
+void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) {
     int i;
     Buff *bufi;
     p->cur_conn++;
@@ -264,6 +273,7 @@ void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr) {
             bufi->cur_parsed = 0;
             bufi->size = BUF_SIZE;
             bufi->fd = conn_sock;
+            bufi->port = port;
             inet_ntop(AF_INET, &(cli_addr->sin_addr),
                       bufi->addr, INET_ADDRSTRLEN);
             FD_SET(conn_sock, &p->read_set);
@@ -290,7 +300,7 @@ void serve_clients(Pool *p) {
     ssize_t readret;
     size_t buf_size;
     char method[BUF_SIZE], uri[BUF_SIZE], version[BUF_SIZE];
-    char filename[BUF_SIZE], cgiargs[BUF_SIZE];
+    char filename[BUF_SIZE], cgiquery[BUF_SIZE];
     char *value;
     int j;
     struct stat sbuf;
@@ -377,7 +387,7 @@ void serve_clients(Pool *p) {
                     bufi->stage = STAGE_BODY;
 
                 if (!strcmp(req->method, "POST")) {
-                    if (NULL == get_hdr_value_by_key(req->header, "Content-Length")) {
+                    if (NULL == (value = get_hdr_value_by_key(req->header, "Content-Length"))) {
                         clienterror(p->logfd, bufi->cur_request,
                                 bufi->addr, "", 
                                 "411", "Length Required",
@@ -386,6 +396,29 @@ void serve_clients(Pool *p) {
                         FD_SET(conn_sock, &p->write_set);
                         continue;
                     }
+
+                    if (!isnumeric(value)) {
+                        clienterror(p->logfd, bufi->cur_request,
+                                bufi->addr, "", 
+                                "400", "Bad Request",
+                                "Liso couldn't parse the request");
+                        bufi->stage = STAGE_ERROR;
+                        FD_SET(conn_sock, &p->write_set);
+                        continue;
+                    }
+
+                    int length = atoi(value);
+                    req->post_body = (char *)malloc(length  + 1);
+                    if ((readret = recv(conn_sock, req->post_body, length, 0)) != length) {
+                        clienterror(p->logfd, bufi->cur_request,
+                                bufi->addr, "", 
+                                "400", "Bad Request",
+                                "Liso couldn't parse the request");
+                        bufi->stage = STAGE_ERROR;
+                        FD_SET(conn_sock, &p->write_set);
+                        continue;
+                    }
+                    req->post_body[length] = '\0';
                 }
 
                 value = get_hdr_value_by_key(req->header, "Connection");
@@ -395,13 +428,12 @@ void serve_clients(Pool *p) {
                     if (!strcmp(value, "close"))
                         bufi->stage = STAGE_CLOSE;
                 }
-
             }
 
 
 
-            j = parse_uri(p, uri, filename, cgiargs);
-            if (stat(filename, &sbuf) < 0) {                     //line:netp:doit:beginnotfound
+            j = parse_uri(p, uri, filename, cgiquery);
+            if (stat(filename, &sbuf) < 0) {                    
                 clienterror(p->logfd, bufi->cur_request, 
                             bufi->addr, filename, 
                             "404", "Not found",
@@ -412,10 +444,17 @@ void serve_clients(Pool *p) {
                 continue;
             }
 
-            serve_static(p->logfd, bufi, filename, sbuf);
+            if (j) {
+                serve_static(p->logfd, bufi, filename, sbuf);
+                FD_SET(conn_sock, &p->write_set);
+            }
+            else
+                serve_dynamic(p->logfd, p, bufi, filename, cgiquery);
+
+
 
             /* Now we can select this fd to test if it can be sent to */
-            FD_SET(conn_sock, &p->write_set); 
+            
             if (VERBOSE)
                 printf("Server received on %d, request:\n%s", 
                     conn_sock, bufi->buf);
@@ -424,64 +463,6 @@ void serve_clients(Pool *p) {
             bufi->cur_size = 0;
             bufi->cur_parsed = 0;
             FD_CLR(conn_sock, &p->ready_read); /* Remove it from ready read */
-
-
-            // while (1) { /* Keep recv, until -1 or short recv encountered */
-            //     buf_size = bufi->size - bufi->cur_size;
-                
-            //     if ((readret = recv(conn_sock, 
-            //                     (bufi->buf + bufi->cur_size), 
-            //                     buf_size, 0)) == -1)
-            //         break;
-                
-            //     /* At this time readret is guaranteed to be positive */
-            //     bufi->cur_size += readret;
-            //     if (readret < buf_size)
-            //         break; /* short recv */
-                
-            //     if (bufi->cur_size >= MAX_SIZE_HEADER) {
-            //         fprintf(stderr, "serve_clients: Incomming msg is "
-            //             "greater than 8192 bytes\n");
-            //         if (close_socket(conn_sock)) {
-            //             fprintf(stderr, "Error closing client socket.\n");
-            //         }
-            //         FD_CLR(conn_sock, &p->read_set);
-            //         p->cur_conn--;
-            //         free_buf(bufi);
-            //         bufi = NULL;
-            //         break;
-            //     }
-
-            //     /* Double the buff size once half buff size is used */    
-            //     if (bufi->cur_size >= (bufi->size / 2)) {
-            //         bufi->buf = realloc(bufi->buf, 
-            //                                  bufi->size * 2);
-            //         bufi->size *= 2;
-            //     }
-            // }
-            // if (bufi == NULL) /* max buff size reached */
-            //     continue;
-
-            // if (readret == -1 && errno == EWOULDBLOCK) { /* Finish recv, would have block */
-            //     if (VERBOSE)
-            //         printf("serve_clients: read all data, block prevented.\n");
-            // } else if (readret <= 0) {
-            //     printf("serve_clients: readret = %d\n", readret);
-            //     if (close_socket(conn_sock)) {
-            //         fprintf(stderr, "Error closing client socket.\n");                        
-            //     }
-            //     p->cur_conn--;
-            //     free_buf(bufi);
-            //     FD_CLR(conn_sock, &p->read_set);
-            //     bufi = NULL;
-            //     continue;
-            // }
-            // /* Now we can select this fd to test if it can be sent to */
-            // FD_SET(conn_sock, &p->write_set); 
-            // if (VERBOSE)
-            //     printf("Server received %d bytes data on %d\n", 
-            //         (int)bufi->cur_size, conn_sock);
-            // FD_CLR(conn_sock, &p->ready_read); /* Remove it from ready read */
         }
     }
 }
@@ -494,6 +475,7 @@ void serve_clients(Pool *p) {
 void server_send(Pool *p) {
     int i, conn_sock;
     ssize_t sendret;
+    ssize_t readret;
     Requests *req;
     Buff *bufi;
     if (VERBOSE)
@@ -547,28 +529,28 @@ void server_send(Pool *p) {
                 close_conn(p, i);
             }
 
+            FD_CLR(conn_sock, &p->write_set);                
+        } /* end if FD_ISSET(conn_sock, &p->ready_write) */
 
-            // if (bufi->cur_size == 0)  /* Skip if this buf is empty */
-            //     continue;
-
-            // if (sendret = mio_sendn(bufi) > 0) {
-            //     if (VERBOSE)
-            //         printf("Server send %d bytes to %d, (%d in buf)\n", 
-            //             (int)sendret, conn_sock, bufi->cur_size);
-            //     bufi->cur_size = 0;
-            // } else {
-            //     if (close_socket(conn_sock)) {
-            //         fprintf(stderr, "Error closing client socket.\n");                        
-            //     }
-            //     p->cur_conn--;
-            //     free_buf(bufi);
-            //     FD_CLR(conn_sock, &p->read_set);
-            //     bufi = NULL;
-            // }
-
-            /* Remove it from write set, since server has sent all data
-               for this particular socket */
-            FD_CLR(conn_sock, &p->write_set);            
+        /* if this is a cgi client */
+        req = bufi->request;
+        while (req) {
+            if (req->valid == REQ_PIPE) {
+                if (FD_ISSET(req->pipefd, &p->ready_read)) {
+                    printf("About to read from pipe\n");
+                    char pipebuf[BUF_SIZE];
+                    readret = mio_readn(req->pipefd, pipebuf, BUF_SIZE-1);
+                    pipebuf[readret] = '\0';
+                    printf("Pipe return:%s\n", pipebuf);
+                    req->response = (char *)malloc(readret + 1);
+                    strcpy(req->response, pipebuf);
+                    req->valid = REQ_VALID;
+                    close(req->pipefd);
+                    FD_SET(conn_sock, &p->write_set);
+                    FD_CLR(req->pipefd, &p->read_set);
+                }
+            }
+            req = req->next;
         }
     }
 }
@@ -789,25 +771,42 @@ void close_conn(Pool *p, int i) {
     p->buf[i] = NULL;
 }
 
+
+/** @brief Parse the uri
+ *  @param p the pointer to the pool
+ *  @param uri the string of uri
+ *  @param filename the pointer to store filename
+ *  @param cgiargs the pointer to store cgi args
+ *  @return 1 if it is a static request
+ *          0 if it is a dynamic request
+ */
 int parse_uri(Pool *p, char *uri, char *filename, char *cgiargs) {
     char *ptr;
 
-    if (!strstr(uri, "cgi-bin")) {  
+    if (!strstr(uri, "/cgi/")) {  
         strcpy(cgiargs, "");                             
         strcpy(filename, p->www);                           
         strcat(filename, uri);                           
         if (uri[strlen(uri)-1] == '/')                   
-            strcat(filename, "index.html");               
+            strcat(filename, "index.html");
+        if (VERBOSE)
+            printf("Static!\n");                   
         return 1;
     } else {  /* Dynamic content */                        
-        ptr = index(uri, '?');                           
+        ptr = index(uri, '?');
         if (ptr) {
             strcpy(cgiargs, ptr+1);
             *ptr = '\0';
         } else 
             strcpy(cgiargs, "");                         
-        strcpy(filename, p->www);                           
-        strcat(filename, uri);                           
+        strcpy(filename, p->cgi);  /* cgi */                         
+        strcat(filename, uri + 4);   /* skip '/cgi/' */
+        if (VERBOSE) {
+            printf("Dynamic!\n");
+            printf("uri:%s\n", uri);
+            printf("filename:%s\n", filename);
+            printf("cgiargs:%s\n", cgiargs);
+        }
         return 0;
     }
 }
@@ -906,4 +905,13 @@ char *get_hdr_value_by_key(Headers *hdr, char *key) {
         hdr = hdr->next;
     }
     return NULL;
+}
+
+int isnumeric(char *str) {
+  while(*str) {
+    if(!isdigit(*str))
+      return 0;
+    str++;
+  }
+  return 1;
 }

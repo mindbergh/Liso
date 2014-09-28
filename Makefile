@@ -42,7 +42,7 @@
 CFLAGS = -Wall -g 
 CC = gcc
 
-objects = loglib.o mio.o lisod.o
+objects = loglib.o mio.o cgi.o lisod.o
 
 
 default: lisod
@@ -52,8 +52,9 @@ default: lisod
 lisod: $(objects)
 	$(CC) -o $@ $^
 
-lisod.o: lisod.c mio.h loglib.h
+lisod.o: lisod.c mio.h loglib.h cgi.h
 mio.o: mio.c mio.h
+cgi.o: cgi.c cgi.h mio.h
 loglib.o: loglib.c loglib.h mio.h
 loglib_test.o: loglib_test.c loglib.h mio.h
 

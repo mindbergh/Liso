@@ -40,6 +40,25 @@ ssize_t mio_sendn(int fd, char *ubuf, size_t n) {
 }
 
 
+ssize_t mio_readn(int fd, char *buf, size_t n) {
+	size_t res = 0;
+	ssize_t nread;
+	size_t nleft = n;
+	while (nleft > 0 && (nread = read(fd, buf + res, nleft)) > 0) {
+		nleft -= nread;
+		res += nread;
+	}
+	if (nread == -1) {
+		if (errno == EAGAIN)
+			return res;
+		else {
+			printf("send error on %s\n", strerror(errno));
+			return -1;
+		}
+	}
+	return res;
+}
+
 /* 
  * mio_readlineb - mingly read a text line (buffered)
  */
