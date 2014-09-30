@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <openssl/ssl.h>
 
 
 
@@ -21,6 +22,10 @@
 #define REQ_VALID               1
 #define REQ_INVALID             0
 #define REQ_PIPE                2
+
+#define IO_SSL                  1
+#define IO_HTTP                 0
+
 
 
 typedef struct headers {
@@ -53,6 +58,7 @@ typedef struct buff {
     char addr[INET_ADDRSTRLEN];  /* client ip address */
     char *buf;    /* actual buf, dynamically allocated */
     int fd;        /* client fd */
+    SSL *client_context;  /* client ssl context */
     int port; 
     unsigned int cur_size; /* current used size of this buf */
     unsigned int cur_parsed;
@@ -86,8 +92,8 @@ typedef struct pool {
 
 
 /* Mio (Ming I/O) package */
-ssize_t mio_sendn(int fd, char *ubuf, size_t n);
-ssize_t mio_readn(int fd, char *buf, size_t n);
-ssize_t mio_recvlineb(int fd, void *usrbuf, size_t maxlen);
+ssize_t mio_sendn(int fd, SSL *ssl_context, char *ubuf, size_t n);
+ssize_t mio_readn(int fd, SSL *ssl_context, char *buf, size_t n);
+ssize_t mio_recvlineb(int fd, SSL *ssl_context, void *usrbuf, size_t maxlen);
 
 #endif

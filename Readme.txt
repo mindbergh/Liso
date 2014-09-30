@@ -92,3 +92,9 @@ purposes are:
         .../Makefile            - Contains rules for make
         .../tests.txt           - your test cases and any known issues you have
         .../vulnerabilities.ext - The vulnerabilities for my impementation
+
+
+
+
+
+./lisod 8887 9999 log a ./static_site . ./mingf.key ./mingf.crt

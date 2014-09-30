@@ -19,9 +19,10 @@ int main() {
 
 
 
-	log_write(fd, req, addr, date, status, size);
-	log_write(fd, req, addr, date, status, 12312);
-	log_write(fd, req, addr, date, status, 123211111);
+	log_write(req, addr, date, status, size);
+	log_write(req, addr, date, status, 12312);
+	log_write(req, addr, date, status, 123211111);
+	log_write_string("Successfully daemonized lisod process, pid: %d\n", 1111);
 
 	fclose(fd);
 	return 1;

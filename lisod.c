@@ -20,17 +20,20 @@
 #include <errno.h>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <openssl/ssl.h>
 
 #include "mio.h"
 #include "loglib.h"
+#include "cgi.h"
 
 #define BUF_SIZE      8192   /* Initial buff size */
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       1    /* Whether to print out debug infomations */
+#define VERBOSE       0    /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
+#define DEAMON        1
 
 
 
@@ -43,14 +46,15 @@
 /* Functions prototypes */
 void usage();
 int open_listen_socket(int port);
-void init_pool(int listen_sock, Pool *p);
+void init_pool(int listen_sock, int ssl_sock, Pool *p);
 void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port);
+void add_client_ssl(SSL *client_context, int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port);
 void serve_clients(Pool *p);
 void server_send(Pool *p);
-void clean_state(Pool *p, int listen_sock);
+void clean_state(Pool *p, int listen_sock, int ssl_sock);
 
 void free_buf(Buff *bufi);
-void clienterror(FILE *fd, Requests *req, char *addr, char *cause, char *errnum, char *shortmsg, char *longmsg);
+void clienterror(Requests *req, char *addr, char *cause, char *errnum, char *shortmsg, char *longmsg);
 int read_requesthdrs(Buff *b, Requests *req);
 void get_time(char *date);
 Requests *get_freereq(Buff *b);
@@ -60,11 +64,13 @@ void close_conn(Pool *p, int i);
 char * get_header(Requests * req, char *key);
 int parse_uri(Pool *p, char *uri, char *filename, char *cgiargs);
 void get_filetype(char *filename, char *filetype);
-void serve_static(FILE *fd, Buff *b, char *filename, struct stat sbuf);
+void serve_static(Buff *b, char *filename, struct stat sbuf);
 void put_req(Requests *req, char *method, char *uri, char *version);
 int is_valid_method(char *method);
 char *get_hdr_value_by_key(Headers *hdr, char *key);
 int isnumeric(char *str);
+int daemonize(char* lock_file);
+void liso_shutdown(int ret);
 
 /** @brief Wrapper function for closing socket
  *  @param sock The socket fd to be closed
@@ -72,7 +78,7 @@ int isnumeric(char *str);
  */ 
 int close_socket(int sock) {
     printf("Close sock %d\n", sock);
-
+    log_write_string("Close sock %d\n", sock);
     if (close(sock)) {
         fprintf(stderr, "Failed closing socket.\n");
         return 1;
@@ -80,17 +86,40 @@ int close_socket(int sock) {
     return 0;
 }
 
+/**
+ * internal signal handler
+ */
+void signal_handler(int sig)
+{
+        switch(sig)
+        {
+                case SIGHUP:
+                        /* rehash the server */
+                        break;          
+                case SIGTERM:
+                        /* finalize and shutdown the server */
+                        liso_shutdown(EXIT_SUCCESS);
+                        break;    
+                default:
+                        break;
+                        /* unhandled signal */      
+        }       
+}
+
 int main(int argc, char* argv[]) {
     int listen_sock, client_sock;
     socklen_t cli_size;
     struct sockaddr cli_addr;
 
+    SSL_CTX *ssl_context;
+    SSL *client_context;
+    int ssl_sock;
+
+
     int http_port;  /* The port for the HTTP server to listen on */
     int https_port; /* The port for the HTTPS server to listen on */
     char *log_file; /* File to send log messages to (debug, info, error) */
     char *lock_file; /* File to lock on when becoming a daemon process */
-    //char *www;  /* Folder containing a tree to serve as the root of website */
-    char *cgi; /* Script where to redirect all CGI URIs */
     char *pri_key; /* Private key file path */
     char *cert;  /* Certificate file path */
 
@@ -110,18 +139,56 @@ int main(int argc, char* argv[]) {
     pri_key = argv[7];
     cert = argv[8];
 
+    if (DEAMON)
+        daemonize(lock_file);
+
     signal(SIGPIPE, SIG_IGN);
     signal(SIGCHLD, SIG_IGN);
 
+    SSL_load_error_strings();
+    SSL_library_init();
+
+    /* we want to use TLSv1 only */
+    if ((ssl_context = SSL_CTX_new(TLSv1_server_method())) == NULL)
+    {
+        fprintf(stderr, "Error creating SSL context.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* register private key */
+    if (SSL_CTX_use_PrivateKey_file(ssl_context, pri_key,
+                                    SSL_FILETYPE_PEM) == 0)
+    {
+        SSL_CTX_free(ssl_context);
+        fprintf(stderr, "Error associating private key.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* register public key (certificate) */
+    if (SSL_CTX_use_certificate_file(ssl_context, cert,
+                                     SSL_FILETYPE_PEM) == 0)
+    {
+        SSL_CTX_free(ssl_context);
+        fprintf(stderr, "Error associating certificate.\n");
+        return EXIT_FAILURE;
+    }
+    /************ END SSL INIT ************/
+
     fprintf(stdout, "----- Echo Server -----\n");
     
+
+    /************ SERVER SOCKET SETUP ************/
     listen_sock = open_listen_socket(http_port);
+    ssl_sock = open_listen_socket(https_port);
+    if (ssl_sock == -1) {
+        close_socket(listen_sock);
+        SSL_CTX_free(ssl_context);
+        return EXIT_FAILURE;
+    }
 
-    if (VERBOSE)
-        printf("listen = %d", listen_sock);
 
-    init_pool(listen_sock, &pool);
-    pool.logfd = log_init(log_file);
+    init_pool(listen_sock, ssl_sock, &pool);
+    log_init(log_file);
     memset(&cli_addr, 0, sizeof(struct sockaddr));
     memset(&cli_size, 0, sizeof(socklen_t));
     
@@ -142,9 +209,42 @@ int main(int argc, char* argv[]) {
             /* Something wrong with select */
             if (VERBOSE)
                 printf("Select error on %s\n", strerror(errno));
-            clean_state(&pool, listen_sock);
+            clean_state(&pool, listen_sock, ssl_sock);
         }
 
+        if (FD_ISSET(ssl_sock, &pool.ready_read) && 
+                     pool.cur_conn <= FD_SETSIZE) {
+            
+            if ((client_sock = accept(ssl_sock, 
+                                    (struct sockaddr *) &cli_addr, 
+                                    &cli_size)) == -1) {
+                clean_state(&pool, listen_sock, ssl_sock);
+                fprintf(stderr, "Error accepting connection.\n");
+                continue;
+            }
+            if (VERBOSE)
+                printf("New client %d accepted via https\n", client_sock);
+
+            /************ WRAP SOCKET WITH SSL ************/
+            if ((client_context = SSL_new(ssl_context)) == NULL)
+            {
+                fprintf(stderr, "Error creating client SSL context.\n");
+                continue;
+            }
+
+            if (SSL_set_fd(client_context, client_sock) == 0)
+            {
+                fprintf(stderr, "Error creating client SSL context.\n");
+                continue;
+            }
+
+            if (SSL_accept(client_context) <= 0)
+            {
+                fprintf(stderr, "Error accepting (handshake) client SSL context.\n");
+                continue;    
+            }
+            add_client_ssl(client_context, client_sock, &pool, (struct sockaddr_in *) &cli_addr, https_port);
+        }
         
         if (FD_ISSET(listen_sock, &pool.ready_read) && 
                      pool.cur_conn <= FD_SETSIZE) {
@@ -152,12 +252,12 @@ int main(int argc, char* argv[]) {
             if ((client_sock = accept(listen_sock, 
                                     (struct sockaddr *) &cli_addr, 
                                     &cli_size)) == -1) {
-                close(listen_sock);
+                clean_state(&pool, listen_sock, ssl_sock);
                 fprintf(stderr, "Error accepting connection.\n");
                 continue;
             }
             if (VERBOSE)
-                printf("New client %d accepted\n", client_sock);
+                printf("New client %d accepted via http\n", client_sock);
 
             fcntl(client_sock, F_SETFL, O_NONBLOCK);
             add_client(client_sock, &pool, (struct sockaddr_in *) &cli_addr, http_port);
@@ -209,7 +309,7 @@ int open_listen_socket(int port) {
     /* servers bind sockets to ports--notify the OS they accept connections */
     if (bind(listen_socket, (struct sockaddr *) &addr, sizeof(addr))) {
         close_socket(listen_socket);
-        fprintf(stderr, "Failed binding socket.\n");
+        fprintf(stderr, "Failed binding socket for port %d.\n", port);
         return EXIT_FAILURE;
     }
 
@@ -229,7 +329,7 @@ int open_listen_socket(int port) {
  *  @param p the pointer to the pool
  *  @return Void
  */
-void init_pool(int listen_sock, Pool *p) {
+void init_pool(int listen_sock, int ssl_sock, Pool *p) {
     int i;
     p->maxi = -1;
     for (i = 0; i < FD_SETSIZE; i++) {
@@ -237,11 +337,12 @@ void init_pool(int listen_sock, Pool *p) {
         p->pipes[i] = -1;
     }
 
-    p->maxfd = listen_sock;
+    p->maxfd = listen_sock > ssl_sock ? listen_sock:ssl_sock;
     p->cur_conn = 0;
     FD_ZERO(&p->read_set);
     FD_ZERO(&p->write_set);
     FD_SET(listen_sock, &p->read_set);
+    FD_SET(ssl_sock, &p->read_set);
 }
 
 /** @brief Add a new client fd
@@ -269,9 +370,57 @@ void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) 
             bufi->request->uri = NULL;
             bufi->request->version = NULL;
             bufi->request->valid = REQ_INVALID;
+            bufi->request->post_body = NULL;
             bufi->cur_size = 0;
             bufi->cur_parsed = 0;
             bufi->size = BUF_SIZE;
+            bufi->fd = conn_sock;
+            bufi->client_context = NULL;
+            bufi->port = port;
+            inet_ntop(AF_INET, &(cli_addr->sin_addr),
+                      bufi->addr, INET_ADDRSTRLEN);
+            FD_SET(conn_sock, &p->read_set);
+
+            if (conn_sock > p->maxfd)
+                p->maxfd = conn_sock;
+            if (i > p->maxi)
+                p->maxi = i;
+            log_write_string("HTTP client added: %s", bufi->addr);
+            break;
+        }
+
+
+    if (i == FD_SETSIZE) {
+        fprintf(stderr, "Too many client.\n");        
+        exit(EXIT_FAILURE);
+    }
+}
+
+void add_client_ssl(SSL *client_context, int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) {
+    int i;
+    Buff *bufi;
+    p->cur_conn++;
+    p->nready--;
+    for (i = 0; i < FD_SETSIZE; i++)
+        if (p->buf[i] == NULL) {
+
+            p->buf[i] = (Buff *)malloc(sizeof(Buff));
+            bufi = p->buf[i];
+            bufi->buf = (char *)malloc(BUF_SIZE);
+            bufi->stage = STAGE_MUV;
+            bufi->request = (Requests *)malloc(sizeof(Requests));
+            bufi->request->response = (char *)malloc(BUF_SIZE);
+            bufi->request->next = NULL;
+            bufi->request->header = NULL;
+            bufi->request->method = NULL;
+            bufi->request->uri = NULL;
+            bufi->request->version = NULL;
+            bufi->request->valid = REQ_INVALID;
+            bufi->request->post_body = NULL;
+            bufi->cur_size = 0;
+            bufi->cur_parsed = 0;
+            bufi->size = BUF_SIZE;
+            bufi->client_context = client_context;
             bufi->fd = conn_sock;
             bufi->port = port;
             inet_ntop(AF_INET, &(cli_addr->sin_addr),
@@ -283,6 +432,7 @@ void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) 
             if (i > p->maxi)
                 p->maxi = i;
             break;
+            log_write_string("HTTPS client added: %s", bufi->addr);
         }
 
     if (i == FD_SETSIZE) {
@@ -297,6 +447,7 @@ void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) 
  */
 void serve_clients(Pool *p) {
     int conn_sock, i;
+    SSL *client_context;
     ssize_t readret;
     size_t buf_size;
     char method[BUF_SIZE], uri[BUF_SIZE], version[BUF_SIZE];
@@ -315,6 +466,7 @@ void serve_clients(Pool *p) {
             continue;
         bufi = p->buf[i];
         conn_sock = bufi->fd;
+        client_context = bufi->client_context;
 
         if (FD_ISSET(conn_sock, &p->ready_read)) {
             p->nready--;
@@ -326,11 +478,11 @@ void serve_clients(Pool *p) {
 
             if (bufi->stage == STAGE_MUV) {
                 buf_size = bufi->size - bufi->cur_size;
-                readret = mio_recvlineb(conn_sock, 
+                readret = mio_recvlineb(conn_sock, client_context,
                                         bufi->buf + bufi->cur_size,
                                         buf_size);
                 if (readret <= 0) {
-                    printf("serve_clients: readret = %d\n", readret);
+                    printf("serve_clients: readret = %d\n", (int)readret);
                     close_conn(p, i);
                     continue;
                 }
@@ -347,7 +499,7 @@ void serve_clients(Pool *p) {
                 req = bufi->cur_request;
                 put_req(req, method, uri, version);
                 if (!is_valid_method(method)) {
-                    clienterror(p->logfd, req, 
+                    clienterror(req, 
                                 bufi->addr, method, 
                                 "505", "Not Implemented",
                                 "Liso does not implement this method");
@@ -357,7 +509,7 @@ void serve_clients(Pool *p) {
                 }
                 
                 if (strcasecmp(version, "HTTP/1.1")) {
-                    clienterror(p->logfd, req, 
+                    clienterror(req, 
                                 bufi->addr, version, 
                                 "501", "HTTP VERSION NOT SUPPORTED",
                                 "Liso does not support this http version");
@@ -373,7 +525,7 @@ void serve_clients(Pool *p) {
                 j = read_requesthdrs(bufi, req);
                 
                 if (j == -2) {
-                    clienterror(p->logfd, bufi->cur_request,
+                    clienterror(bufi->cur_request,
                                 bufi->addr, "", 
                                 "400", "Bad Request",
                                 "Liso couldn't parse the request");
@@ -388,7 +540,7 @@ void serve_clients(Pool *p) {
 
                 if (!strcmp(req->method, "POST")) {
                     if (NULL == (value = get_hdr_value_by_key(req->header, "Content-Length"))) {
-                        clienterror(p->logfd, bufi->cur_request,
+                        clienterror(bufi->cur_request,
                                 bufi->addr, "", 
                                 "411", "Length Required",
                                 "Liso needs Content-Length header");
@@ -398,7 +550,7 @@ void serve_clients(Pool *p) {
                     }
 
                     if (!isnumeric(value)) {
-                        clienterror(p->logfd, bufi->cur_request,
+                        clienterror(bufi->cur_request,
                                 bufi->addr, "", 
                                 "400", "Bad Request",
                                 "Liso couldn't parse the request");
@@ -409,16 +561,31 @@ void serve_clients(Pool *p) {
 
                     int length = atoi(value);
                     req->post_body = (char *)malloc(length  + 1);
-                    if ((readret = recv(conn_sock, req->post_body, length, 0)) != length) {
-                        clienterror(p->logfd, bufi->cur_request,
-                                bufi->addr, "", 
-                                "400", "Bad Request",
-                                "Liso couldn't parse the request");
-                        bufi->stage = STAGE_ERROR;
-                        FD_SET(conn_sock, &p->write_set);
-                        continue;
+                    if (client_context != NULL) {
+                        if ((readret = SSL_read(client_context, 
+                                                req->post_body, 
+                                                length)) != length) {
+                            clienterror(bufi->cur_request,
+                                    bufi->addr, "", 
+                                    "400", "Bad Request",
+                                    "Liso couldn't parse the request");
+                            bufi->stage = STAGE_ERROR;
+                            FD_SET(conn_sock, &p->write_set);
+                            continue;
+                        }
+                        req->post_body[length] = '\0';
+                    } else {
+                        if ((readret = recv(conn_sock, req->post_body, length, 0)) != length) {
+                            clienterror(bufi->cur_request,
+                                    bufi->addr, "", 
+                                    "400", "Bad Request",
+                                    "Liso couldn't parse the request");
+                            bufi->stage = STAGE_ERROR;
+                            FD_SET(conn_sock, &p->write_set);
+                            continue;
+                        }
+                        req->post_body[length] = '\0';
                     }
-                    req->post_body[length] = '\0';
                 }
 
                 value = get_hdr_value_by_key(req->header, "Connection");
@@ -434,7 +601,7 @@ void serve_clients(Pool *p) {
 
             j = parse_uri(p, uri, filename, cgiquery);
             if (stat(filename, &sbuf) < 0) {                    
-                clienterror(p->logfd, bufi->cur_request, 
+                clienterror(bufi->cur_request, 
                             bufi->addr, filename, 
                             "404", "Not found",
                             "Liso couldn't find this file");
@@ -445,11 +612,11 @@ void serve_clients(Pool *p) {
             }
 
             if (j) {
-                serve_static(p->logfd, bufi, filename, sbuf);
+                serve_static(bufi, filename, sbuf);
                 FD_SET(conn_sock, &p->write_set);
             }
             else
-                serve_dynamic(p->logfd, p, bufi, filename, cgiquery);
+                serve_dynamic(p, bufi, filename, cgiquery);
 
 
 
@@ -474,6 +641,7 @@ void serve_clients(Pool *p) {
  */
 void server_send(Pool *p) {
     int i, conn_sock;
+    SSL *client_context;
     ssize_t sendret;
     ssize_t readret;
     Requests *req;
@@ -488,6 +656,7 @@ void server_send(Pool *p) {
             continue;
         bufi = p->buf[i];
         conn_sock = bufi->fd;
+        client_context = bufi->client_context;
 
         if (FD_ISSET(conn_sock, &p->ready_write)) {
             req = bufi->request;
@@ -497,7 +666,8 @@ void server_send(Pool *p) {
                     continue;
                 }
 
-                if ((sendret = mio_sendn(conn_sock, req->response, strlen(req->response))) > 0) {
+                if ((sendret = mio_sendn(conn_sock, client_context, 
+                                         req->response, strlen(req->response))) > 0) {
                     if (VERBOSE)
                         printf("Server send header to %d\n", conn_sock);
                     
@@ -509,9 +679,10 @@ void server_send(Pool *p) {
                 }
 
                 if (req->body != NULL) {
-                    if ((sendret = mio_sendn(conn_sock, req->body, req->body_size)) > 0) {
+                    if ((sendret = mio_sendn(conn_sock, client_context,
+                                             req->body, req->body_size)) > 0) {
                         if (VERBOSE)
-                            printf("Server send %d bytes to %d\n",sendret, conn_sock);
+                            printf("Server send %d bytes to %d\n",(int)sendret, conn_sock);
                         munmap(req->body, req->body_size);
                         req->body = NULL;
                     } else {
@@ -539,7 +710,7 @@ void server_send(Pool *p) {
                 if (FD_ISSET(req->pipefd, &p->ready_read)) {
                     printf("About to read from pipe\n");
                     char pipebuf[BUF_SIZE];
-                    readret = mio_readn(req->pipefd, pipebuf, BUF_SIZE-1);
+                    readret = mio_readn(req->pipefd, NULL, pipebuf, BUF_SIZE-1);
                     pipebuf[readret] = '\0';
                     printf("Pipe return:%s\n", pipebuf);
                     req->response = (char *)malloc(readret + 1);
@@ -560,7 +731,7 @@ void server_send(Pool *p) {
  *  @param p the pointer to the pool
  *  @return Void
  */
-void clean_state(Pool *p, int listen_sock) {
+void clean_state(Pool *p, int listen_sock, int ssl_sock) {
     int i, conn_sock;
     for (i = 0; i <= p->maxi; i++) {
         if (p->buf[i]) {
@@ -575,7 +746,7 @@ void clean_state(Pool *p, int listen_sock) {
         }
     }
     p->maxi = -1;
-    p->maxfd = listen_sock;
+    p->maxfd = listen_sock > ssl_sock?listen_sock:ssl_sock;
     p->cur_conn = 0;
 }
 
@@ -588,7 +759,8 @@ void free_buf(Buff *bufi) {
     free(bufi->buf);
 
     req = bufi->request;
-
+    if (bufi->client_context)
+        SSL_free(bufi->client_context);
     while (req) {
         req_pre = req;
         req = req->next;
@@ -605,6 +777,8 @@ void free_buf(Buff *bufi) {
             free(req_pre->uri);
         if (req_pre->version)
             free(req_pre->version);
+        if (req_pre->post_body)
+            free(req_pre->post_body);
         free(req_pre->response);
         free(req_pre);
     }
@@ -612,7 +786,7 @@ void free_buf(Buff *bufi) {
 }
 
 
-void clienterror(FILE *fd, Requests *req, char *addr, char *cause, char *errnum, char *shortmsg, char *longmsg) {
+void clienterror(Requests *req, char *addr, char *cause, char *errnum, char *shortmsg, char *longmsg) {
     char date[DATE_SIZE], body[BUF_SIZE], hdr[BUF_SIZE];
     int len = 0;
     get_time(date);
@@ -631,7 +805,7 @@ void clienterror(FILE *fd, Requests *req, char *addr, char *cause, char *errnum,
     len = strlen(hdr);
     req->response = (char *)malloc(len + 1);
     sprintf(req->response, "%s", hdr);
-    log_write(fd, req, addr, date, errnum, len);
+    log_write(req, addr, date, errnum, len);
     req->body = NULL;
     req->valid = REQ_VALID;
 }
@@ -657,7 +831,7 @@ int read_requesthdrs(Buff *b, Requests *req) {
 
     while (1) {
         buf += len;
-        mio_recvlineb(b->fd, buf, b->size - b->cur_size);
+        mio_recvlineb(b->fd, b->client_context, buf, b->size - b->cur_size);
         len = strlen(buf);
 
         if (len == 0)
@@ -839,7 +1013,7 @@ void put_req(Requests *req, char *method, char *uri, char *version) {
 
 
 
-void serve_static(FILE *fd, Buff *b, char *filename, struct stat sbuf) {
+void serve_static(Buff *b, char *filename, struct stat sbuf) {
     int srcfd;
     int filesize = sbuf.st_size;
     int len = 0;
@@ -871,9 +1045,9 @@ void serve_static(FILE *fd, Buff *b, char *filename, struct stat sbuf) {
         req->body = srcp;
         req->body_size = filesize;
         close(srcfd);                       
-        log_write(fd, req, b->addr, date, "200", len + filesize);    
+        log_write(req, b->addr, date, "200", len + filesize);    
     } else {
-        log_write(fd, req, b->addr, date, "200", len);
+        log_write(req, b->addr, date, "200", len);
     }
  
     
@@ -914,4 +1088,56 @@ int isnumeric(char *str) {
     str++;
   }
   return 1;
+}
+
+/** 
+ * internal function daemonizing the process
+ */
+int daemonize(char* lock_file)
+{
+        /* drop to having init() as parent */
+        int i, lfp, pid = fork();
+        char str[256] = {0};
+        if (pid < 0) exit(EXIT_FAILURE);
+        if (pid > 0) exit(EXIT_SUCCESS);
+
+        setsid();
+
+        for (i = getdtablesize(); i>=0; i--)
+            close(i);
+
+        i = open("/dev/null", O_RDWR);
+        dup(i); /* stdout */
+        dup(i); /* stderr */
+        umask(027);
+
+        lfp = open(lock_file, O_RDWR|O_CREAT, 0640);
+        
+        if (lfp < 0)
+            exit(EXIT_FAILURE); /* can not open */
+
+        if (lockf(lfp, F_TLOCK, 0) < 0)
+            exit(EXIT_SUCCESS); /* can not lock */
+        
+        /* only first instance continues */
+        sprintf(str, "%d\n", getpid());
+        write(lfp, str, strlen(str)); /* record pid to lockfile */
+
+        signal(SIGCHLD, SIG_IGN); /* child terminate signal */
+
+        signal(SIGHUP, signal_handler); /* hangup signal */
+        signal(SIGTERM, signal_handler); /* software termination signal from kill */
+
+        // TODO: log --> "Successfully daemonized lisod process, pid %d."
+        log_write_string("Successfully daemonized lisod process, pid: %s\n", str);
+
+        return EXIT_SUCCESS;
+}
+
+
+
+void liso_shutdown(int ret) {
+    log_write_string("Liso shutdown\n");
+    log_close();
+    exit(ret);
 }

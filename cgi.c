@@ -106,15 +106,13 @@ processes.\n");
 /**************** END UTILITY FUNCTIONS ***************/
 
 
-void serve_dynamic(FILE *fd, Pool *p, Buff *b, char *filename, char *cgiquery) {
+int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
     /*************** BEGIN VARIABLE DECLARATIONS **************/
     Requests *req = b->cur_request;
     pid_t pid;
     int stdin_pipe[2];
     int stdout_pipe[2];
-    char buf[BUF_SIZE];
     char *envp[ENVP_SIZE];
-    int readret;
     char* argv[] = {
         filename,
         NULL
@@ -207,11 +205,11 @@ void serve_dynamic(FILE *fd, Pool *p, Buff *b, char *filename, char *cgiquery) {
 
 //         if (readret == 0)
 //         {
-//             fprintf(stdout, "CGI spawned process returned with EOF as \
+//             fprintf(stdout, "CGI spawned process returned with EOF as 
 // expected.\n");
 //             return EXIT_SUCCESS;
 //         }
-        return;
+        return EXIT_SUCCESS;
     }
     /*************** END FORK **************/
 

@@ -17,7 +17,7 @@
 
 /* CGI package */
 void execve_error_handler(void);
-void serve_dynamic(FILE *fd, Pool *p, Buff *b, char *filename, char *cgiquery);
+int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery);
 void build_envp(char **envp, Buff *b, char *cgiquery);
 char *malloc_string(char *str);
 void free_envp(char **str);

@@ -14,7 +14,11 @@
 #define INIT_NEW      1
 #define INIT_APPEND   2
 
-FILE * log_init(char *log_file);
-void log_write(FILE *fd, Requests *req, char *addr, char *date, char *status, int size);
+
+
+void log_init(char *file);
+void log_write(Requests *req, char *addr, char *date, char *status, int size);
+void log_write_string(char *format, ...);
+void log_close(void);
 
 #endif

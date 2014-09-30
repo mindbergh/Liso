@@ -39,8 +39,9 @@
 # 	rm -f *~ *.o lisod echo_client
 
 
-CFLAGS = -Wall -g 
+CFLAGS = -Wall -g
 CC = gcc
+LDFLAGS = -lssl
 
 objects = loglib.o mio.o cgi.o lisod.o
 
@@ -50,11 +51,12 @@ default: lisod
 .PHONY: default clean clobber handin
 
 lisod: $(objects)
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 lisod.o: lisod.c mio.h loglib.h cgi.h
 mio.o: mio.c mio.h
 cgi.o: cgi.c cgi.h mio.h
+#liso_ssl.o: liso_ssl.c liso_ssl.h mio.h
 loglib.o: loglib.c loglib.h mio.h
 loglib_test.o: loglib_test.c loglib.h mio.h
 
@@ -63,11 +65,11 @@ loglib_test.o: loglib_test.c loglib.h mio.h
 
 
 loglib_test: loglib_test.o loglib.o loglib.h mio.o mio.h
-	${CC} loglib.o loglib_test.o mio.o -o $@
+	${CC} loglib.o loglib_test.o mio.o -o $@ $(LDFLAGS)
 
 
 clean:
-	rm -f  loglib.o mio.o lisod.o echo_client.o loglib_test.o lisod loglib_test echo_client log
+	rm -f  loglib.o mio.o lisod.o echo_client.o loglib_test.o lisod loglib_test echo_client log cgi.o liso_ssl.o
 
 clobber: clean
 	rm -f lisod
