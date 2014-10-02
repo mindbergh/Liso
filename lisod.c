@@ -33,8 +33,8 @@
 #define VERBOSE       0 /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
-#define DEAMON        0
-#define AB            0
+#define DEAMON        1
+#define AB            1
 
 
 
