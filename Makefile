@@ -75,7 +75,7 @@ clobber: clean
 	rm -f lisod
 
 handin:
-	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude cp1_checker.py --exclude README --exclude static_site --exclude dumper.py --exclude liso_prototype.py --exclude http_parser.h)
+	(make clean; cd ..; tar cvf handin.tar 15-441-project-1 --exclude test --exclude cp1_checker.py --exclude README --exclude static_site --exclude dumper.py --exclude liso_prototype.py --exclude http_parser.h)
 
 
 
