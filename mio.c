@@ -25,7 +25,7 @@ ssize_t mio_sendn(int fd, SSL *ssl_context, char *ubuf, size_t n) {
 				nsend = 0;    /* and call send() again */
 			else if (errno == EPIPE) {
 				fprintf(stderr, "EPIPE handled\n");
-				return nsend;
+				return -1;
 			} else if (errno == EAGAIN) {
 				nsend = 0;
 			} else {
@@ -45,7 +45,7 @@ ssize_t mio_sendn(int fd, SSL *ssl_context, char *ubuf, size_t n) {
 			nsend = 0;    /* and call send() again */
 		else if (errno == EPIPE) {
 			fprintf(stderr, "EPIPE handled\n");
-			return nsend;
+			return -1;
 		} else if (errno == EAGAIN) {
 			nsend = 0;
 		} else {

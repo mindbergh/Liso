@@ -30,10 +30,10 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       0 /* Whether to print out debug infomations */
+#define VERBOSE       1 /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
-#define DEAMON        1
+#define DEAMON        0
 #define AB            1
 
 
@@ -112,6 +112,8 @@ int main(int argc, char* argv[]) {
     socklen_t cli_size;
     struct sockaddr cli_addr;
 
+    sigset_t mask, old_mask;
+
     SSL_CTX *ssl_context;
     SSL *client_context;
     int ssl_sock;
@@ -143,9 +145,21 @@ int main(int argc, char* argv[]) {
     if (DEAMON)
         daemonize(lock_file);
 
-    signal(SIGPIPE, SIG_IGN);
-    signal(SIGCHLD, SIG_IGN);
 
+
+
+
+
+    sigemptyset(&mask);
+    sigemptyset(&old_mask);
+    sigaddset(&mask, SIGPIPE);
+    sigprocmask(SIG_BLOCK, &mask, &old_mask);
+
+
+
+
+
+    //signal(SIGPIPE, SIG_IGN);
     SSL_load_error_strings();
     SSL_library_init();
 
@@ -672,8 +686,9 @@ void server_send(Pool *p) {
                     
                 } else {
                     close_conn(p, i);
+                    req->valid = REQ_INVALID;
                     req = req->next;
-                    continue;
+                    break;
 
                 }
 
@@ -687,7 +702,7 @@ void server_send(Pool *p) {
                     } else {                        
                         close_conn(p, i);
                         req = req->next;
-                        continue;
+                        break;
                     }
                 }
 
@@ -701,6 +716,8 @@ void server_send(Pool *p) {
             FD_CLR(conn_sock, &p->write_set);                
         } /* end if FD_ISSET(conn_sock, &p->ready_write) */
 
+        if (p->buf[i] == NULL)
+            continue;
         /* if this is a cgi client */
         req = bufi->request;
         while (req) {
