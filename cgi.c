@@ -17,7 +17,7 @@
 /**************** BEGIN CONSTANTS ***************/
 #define BUF_SIZE    4096
 #define ENVP_SIZE   30
-#define VERBOSE     0
+#define VERBOSE     1
 
 /**************** END CONSTANTS ***************/
 

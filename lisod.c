@@ -30,7 +30,7 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       0    /* Whether to print out debug infomations */
+#define VERBOSE       1    /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
 #define DEAMON        0
@@ -688,8 +688,7 @@ void server_send(Pool *p) {
                             printf("Server send %d bytes to %d\n",(int)sendret, conn_sock);
                         munmap(req->body, req->body_size);
                         req->body = NULL;
-                    } else {
-                        
+                    } else {                        
                         close_conn(p, i);
                         req = req->next;
                         continue;
@@ -722,9 +721,11 @@ void server_send(Pool *p) {
                     strcpy(req->response, pipebuf);
                     req->valid = REQ_VALID;
                     close(req->pipefd);
+                    
                     p->cur_conn -= 1;
                     FD_SET(conn_sock, &p->write_set);
                     FD_CLR(req->pipefd, &p->read_set);
+                    req->pipefd = -1;   
                 }
             }
             req = req->next;
@@ -785,6 +786,8 @@ void free_buf(Buff *bufi) {
             free(req_pre->version);
         if (req_pre->post_body)
             free(req_pre->post_body);
+        if (req_pre->pipefd != -1)
+            close(req_pre->pipefd);
         free(req_pre->response);
         free(req_pre);
     }
@@ -852,7 +855,7 @@ int read_requesthdrs(Buff *b, Requests *req) {
         if (!strcmp(buf, "\r\n"))
             break;
 
-        i = sscanf(b->buf + b->cur_parsed, "%[^':']:%s\r\n", key, value);
+        i = sscanf(b->buf + b->cur_parsed, "%[^':']: %[^'\r\n']", key, value);
 
         if (i != 2) return -2;
         
@@ -890,12 +893,14 @@ Requests *get_freereq(Buff *b) {
             free(hdr_pre);
         }
         req->header = NULL;
-        return req;
-    }
-    else {
+        
+    } else {
         req->next = (Requests *)malloc(sizeof(Requests));
-        return req->next;
+        req = req->next;  
     }
+    req->pipefd = -1;
+    req->next = NULL;
+    return req;
 }
 
 void put_header(Requests * req, char *key, char *value) {
