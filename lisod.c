@@ -694,9 +694,9 @@ void server_send(Pool *p) {
                 req->valid = REQ_INVALID;
                 req = req->next;
             }
-            if (bufi->stage == STAGE_ERROR || bufi->stage == STAGE_CLOSE) {
-                close_conn(p, i);
-            }
+            // if (bufi->stage == STAGE_ERROR || bufi->stage == STAGE_CLOSE) {
+            //     close_conn(p, i);
+            // }
 
             FD_CLR(conn_sock, &p->write_set);                
         } /* end if FD_ISSET(conn_sock, &p->ready_write) */
