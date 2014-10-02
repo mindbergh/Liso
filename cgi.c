@@ -17,6 +17,7 @@
 /**************** BEGIN CONSTANTS ***************/
 #define BUF_SIZE    4096
 #define ENVP_SIZE   30
+#define VERBOSE     0
 
 /**************** END CONSTANTS ***************/
 
@@ -174,7 +175,8 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
     if (pid > 0)
     {
         free_envp(envp);
-        fprintf(stdout, "Parent: Heading to select() loop.\n");
+        if (VERBOSE)
+            fprintf(stdout, "Parent: Heading to select() loop.\n");
         close(stdout_pipe[1]);
         close(stdin_pipe[0]);
         if (!strcmp(req->method, "POST")) {
@@ -183,7 +185,8 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
                 fprintf(stderr, "Error writing to spawned CGI program.\n");
                 return EXIT_FAILURE;
             }
-            printf("Write post %d bytes body:%s\n", readret, req->post_body);
+            if (VERBOSE)
+                printf("Write post %d bytes body:%s\n", readret, req->post_body);
         }
 
         close(stdin_pipe[1]); /* finished writing to spawn */
@@ -202,10 +205,10 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
         FD_SET(req->pipefd, &p->read_set);
         if (req->pipefd > p->maxfd)
             p->maxfd = req->pipefd;
-
+        p->cur_conn += 1;
 
         //close(stdout_pipe[0]);
-        close(stdin_pipe[1]);
+        //close(stdin_pipe[1]);
 
 //         if (readret == 0)
 //         {

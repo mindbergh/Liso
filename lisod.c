@@ -33,7 +33,7 @@
 #define VERBOSE       0    /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
-#define DEAMON        1
+#define DEAMON        0
 
 
 
@@ -213,7 +213,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (FD_ISSET(ssl_sock, &pool.ready_read) && 
-                     pool.cur_conn <= FD_SETSIZE) {
+                     pool.cur_conn <= FD_SETSIZE - 4) {
             
             if ((client_sock = accept(ssl_sock, 
                                     (struct sockaddr *) &cli_addr, 
@@ -247,7 +247,7 @@ int main(int argc, char* argv[]) {
         }
         
         if (FD_ISSET(listen_sock, &pool.ready_read) && 
-                     pool.cur_conn <= FD_SETSIZE) {
+                     pool.cur_conn <= FD_SETSIZE - 4) {
             
             if ((client_sock = accept(listen_sock, 
                                     (struct sockaddr *) &cli_addr, 
@@ -262,6 +262,7 @@ int main(int argc, char* argv[]) {
             fcntl(client_sock, F_SETFL, O_NONBLOCK);
             add_client(client_sock, &pool, (struct sockaddr_in *) &cli_addr, http_port);
         }
+
         serve_clients(&pool);
         if (pool.nready)
             server_send(&pool);
@@ -710,15 +711,18 @@ void server_send(Pool *p) {
         while (req) {
             if (req->valid == REQ_PIPE) {
                 if (FD_ISSET(req->pipefd, &p->ready_read)) {
-                    printf("About to read from pipe\n");
+                    if (VERBOSE)
+                        printf("About to read from pipe\n");
                     char pipebuf[BUF_SIZE];
                     readret = mio_readn(req->pipefd, NULL, pipebuf, BUF_SIZE-1);
                     pipebuf[readret] = '\0';
-                    printf("Pipe return:%s\n", pipebuf);
+                    if (VERBOSE)
+                        printf("Pipe return:%s\n", pipebuf);
                     req->response = (char *)malloc(readret + 1);
                     strcpy(req->response, pipebuf);
                     req->valid = REQ_VALID;
                     close(req->pipefd);
+                    p->cur_conn -= 1;
                     FD_SET(conn_sock, &p->write_set);
                     FD_CLR(req->pipefd, &p->read_set);
                 }
