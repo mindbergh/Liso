@@ -30,11 +30,11 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       1  /* Whether to print out debug infomations */
+#define VERBOSE       0  /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
-#define DEAMON        0
-#define AB            0
+#define DEAMON        1
+#define AB            1
 
 
 
