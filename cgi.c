@@ -110,6 +110,8 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
     /*************** BEGIN VARIABLE DECLARATIONS **************/
     Requests *req = b->cur_request;
     pid_t pid;
+    char buf[4096];
+    int readret;
     int stdin_pipe[2];
     int stdout_pipe[2];
     char *envp[ENVP_SIZE];
@@ -175,12 +177,14 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
         fprintf(stdout, "Parent: Heading to select() loop.\n");
         close(stdout_pipe[1]);
         close(stdin_pipe[0]);
-        if (!strcmp(req->method, "POST"))
-            if (write(stdin_pipe[1], req->post_body, strlen(req->post_body)) < 0)   
+        if (!strcmp(req->method, "POST")) {
+            if ((readret = write(stdin_pipe[1], req->post_body, strlen(req->post_body))) < 0)   
             {
                 fprintf(stderr, "Error writing to spawned CGI program.\n");
                 return EXIT_FAILURE;
             }
+            printf("Write post %d bytes body:%s\n", readret, req->post_body);
+        }
 
         close(stdin_pipe[1]); /* finished writing to spawn */
 
@@ -231,8 +235,10 @@ void build_envp(char **envp, Buff *b, char *cgiquery) {
     envp[i++] = malloc_string(temp);
     sprintf(temp, "REQUEST_URI=%s", req->uri);
     envp[i++] = malloc_string(temp);
-    sprintf(temp, "QUERY_STRING=%s", cgiquery);
-    envp[i++] = malloc_string(temp);
+    if (*cgiquery != '\0') {
+        sprintf(temp, "QUERY_STRING=%s", cgiquery);
+        envp[i++] = malloc_string(temp);
+    }
     envp[i++] = malloc_string("SCRIPT_NAME=/cgi");  /* hard coded */
     sprintf(temp, "REMOTE_ADDR=%s", b->addr);
     envp[i++] = malloc_string(temp);
@@ -242,45 +248,44 @@ void build_envp(char **envp, Buff *b, char *cgiquery) {
     envp[i++] = malloc_string(temp);
     envp[i++] = malloc_string("SERVER_PROTOCOL=HTTP/1.1");
     envp[i++] = malloc_string("SERVER_SOFTWARE=Liso/1.0");
-    while (req) {
-        hdr = req->header;
-        if (hdr == NULL)
-            break;
+    envp[i++] = malloc_string("SERVER_NAME=Liso/1.0");
+    hdr = req->header;
+    while (hdr) {       
         if (!strcasecmp(hdr->key, "Content-Length")) {
             sprintf(temp, "CONTENT_LENGTH=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Content-Type")) {
             sprintf(temp, "CONTENT_TYPE=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Accept")) {
             sprintf(temp, "HTTP_ACCEPT=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Referer")) {
             sprintf(temp, "HTTP_REFERER=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Accept-Encoding")) {
             sprintf(temp, "HTTP_ACCEPT_ENCODING=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Accept-Language")) {
             sprintf(temp, "HTTP_ACCEPT_LANGUAGE=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Accept-Charset")) {
             sprintf(temp, "HTTP_ACCEPT_CHARSET=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Host")) {
             sprintf(temp, "HTTP_HOST=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Cookie")) {
             sprintf(temp, "HTTP_COOKIE=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "User-Agent")) {
             sprintf(temp, "HTTP_USER_AGENT=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         } else if (!strcasecmp(hdr->key, "Connection")) {
             sprintf(temp, "HTTP_CONNECTION=%s", hdr->value);
-            envp[i++] = malloc_string("temp");
+            envp[i++] = malloc_string(temp);
         }
-        req = req->next;
+        hdr = hdr->next;
     }
     envp[i] = NULL;
 }

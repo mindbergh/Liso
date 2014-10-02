@@ -30,10 +30,10 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       0    /* Whether to print out debug infomations */
+#define VERBOSE       1    /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
-#define DEAMON        1
+#define DEAMON        0
 
 
 
@@ -560,7 +560,7 @@ void serve_clients(Pool *p) {
                     }
 
                     int length = atoi(value);
-                    req->post_body = (char *)malloc(length  + 1);
+                    req->post_body = (char *)malloc(length + 1);
                     if (client_context != NULL) {
                         if ((readret = SSL_read(client_context, 
                                                 req->post_body, 
@@ -586,6 +586,8 @@ void serve_clients(Pool *p) {
                         }
                         req->post_body[length] = '\0';
                     }
+                    if (VERBOSE)
+                        printf("post_body:%s\n", req->post_body);
                 }
 
                 value = get_hdr_value_by_key(req->header, "Connection");
@@ -974,7 +976,8 @@ int parse_uri(Pool *p, char *uri, char *filename, char *cgiargs) {
         } else 
             strcpy(cgiargs, "");                         
         strcpy(filename, p->cgi);  /* cgi */                         
-        strcat(filename, uri + 4);   /* skip '/cgi/' */
+        //strcat(filename, uri + 4);   /* skip '/cgi/' */
+        //uri += 4; /* skip '/cgi'*/
         if (VERBOSE) {
             printf("Dynamic!\n");
             printf("uri:%s\n", uri);
