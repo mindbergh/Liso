@@ -30,10 +30,11 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       0    /* Whether to print out debug infomations */
+#define VERBOSE       1  /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
-#define DEAMON        1
+#define DEAMON        0
+#define AB            0
 
 
 
@@ -453,6 +454,7 @@ void serve_clients(Pool *p) {
     size_t buf_size;
     char method[BUF_SIZE], uri[BUF_SIZE], version[BUF_SIZE];
     char filename[BUF_SIZE], cgiquery[BUF_SIZE];
+    char buf[BUF_SIZE];
     char *value;
     int j;
     struct stat sbuf;
@@ -508,16 +510,16 @@ void serve_clients(Pool *p) {
                     FD_SET(conn_sock, &p->write_set);                    
                     continue;                  
                 }
-                
-                if (strcasecmp(version, "HTTP/1.1")) {
-                    clienterror(req, 
-                                bufi->addr, version, 
-                                "501", "HTTP VERSION NOT SUPPORTED",
-                                "Liso does not support this http version");
-                    bufi->stage = STAGE_ERROR;
-                    FD_SET(conn_sock, &p->write_set);
-                    continue;
-                }
+                if (AB)
+                    if (strcasecmp(version, "HTTP/1.1")) {
+                        clienterror(req, 
+                                    bufi->addr, version, 
+                                    "501", "HTTP VERSION NOT SUPPORTED",
+                                    "Liso does not support this http version");
+                        bufi->stage = STAGE_ERROR;
+                        FD_SET(conn_sock, &p->write_set);
+                        continue;
+                    }
                 bufi->stage = STAGE_HEADER;
                 bufi->cur_parsed = bufi->cur_size;
             }
@@ -561,32 +563,26 @@ void serve_clients(Pool *p) {
                     }
 
                     int length = atoi(value);
-                    req->post_body = (char *)malloc(length + 1);
-                    if (client_context != NULL) {
-                        if ((readret = SSL_read(client_context, 
-                                                req->post_body, 
-                                                length)) != length) {
-                            clienterror(bufi->cur_request,
+                    
+                    // if (client_context != NULL) {
+                    //     readret = SSL_read(client_context, 
+                    //                             buf, 
+                    //                             BUF_SIZE - 1);
+                    // } else {
+                    //     readret = recv(conn_sock, buf, BUF_SIZE - 1, 0);        
+                    // }
+                    readret = mio_recvlineb(conn_sock, client_context, buf, BUF_SIZE - 1);
+                    if (readret != length + 1) {
+                        clienterror(bufi->cur_request,
                                     bufi->addr, "", 
                                     "400", "Bad Request",
                                     "Liso couldn't parse the request");
-                            bufi->stage = STAGE_ERROR;
-                            FD_SET(conn_sock, &p->write_set);
-                            continue;
-                        }
-                        req->post_body[length] = '\0';
-                    } else {
-                        if ((readret = recv(conn_sock, req->post_body, length, 0)) != length) {
-                            clienterror(bufi->cur_request,
-                                    bufi->addr, "", 
-                                    "400", "Bad Request",
-                                    "Liso couldn't parse the request");
-                            bufi->stage = STAGE_ERROR;
-                            FD_SET(conn_sock, &p->write_set);
-                            continue;
-                        }
-                        req->post_body[length] = '\0';
+                        bufi->stage = STAGE_ERROR;
+                        FD_SET(conn_sock, &p->write_set);
+                        continue;
                     }
+                    req->post_body = (char *)malloc(length + 1);
+                    strcpy(req->post_body, buf);
                     if (VERBOSE)
                         printf("post_body:%s\n", req->post_body);
                 }
