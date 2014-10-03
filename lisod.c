@@ -569,16 +569,19 @@ void serve_clients(Pool *p) {
                     }
 
                     int length = atoi(value);
-                    
-                    // if (client_context != NULL) {
-                    //     readret = SSL_read(client_context, 
-                    //                             buf, 
-                    //                             BUF_SIZE - 1);
-                    // } else {
-                    //     readret = recv(conn_sock, buf, BUF_SIZE - 1, 0);        
-                    // }
-                    readret = mio_recvlineb(conn_sock, client_context, buf, BUF_SIZE - 1);
-                    if (readret != length + 1) {
+                    if (VERBOSE)
+                        printf("length atoi = %d\n", length);                    
+                    if (client_context != NULL) {
+                        readret = SSL_read(client_context, 
+                                                buf, 
+                                                BUF_SIZE - 1);
+                    } else {
+                        readret = recv(conn_sock, buf, BUF_SIZE - 1, 0);        
+                    }
+                    //readret = mio_recvn(conn_sock, client_context, buf, BUF_SIZE - 1);
+                    if (VERBOSE)
+                        printf("readret =  %d\n", readret);
+                    if (readret != length) {
                         clienterror(bufi->cur_request,
                                     bufi->addr, "", 
                                     "400", "Bad Request",
@@ -588,7 +591,8 @@ void serve_clients(Pool *p) {
                         continue;
                     }
                     req->post_body = (char *)malloc(length + 1);
-                    strcpy(req->post_body, buf);
+                    strncpy(req->post_body, buf, length);
+                    req->post_body[length] = '\0';
                     if (VERBOSE)
                         printf("post_body:%s\n", req->post_body);
                 }
@@ -873,6 +877,8 @@ int read_requesthdrs(Buff *b, Requests *req) {
         put_header(req, key, value);
     }
     b->stage = STAGE_BODY;
+    if (VERBOSE)
+        printf("leaving read request\n");
     return 1;
 }
 
