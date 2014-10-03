@@ -507,7 +507,7 @@ void serve_clients(Pool *p) {
                 if (!is_valid_method(method)) {
                     clienterror(req, 
                                 bufi->addr, method, 
-                                "505", "Not Implemented",
+                                "501", "Not Implemented",
                                 "Liso does not implement this method");
                     bufi->stage = STAGE_ERROR;
                     FD_SET(conn_sock, &p->write_set);                    
@@ -517,7 +517,7 @@ void serve_clients(Pool *p) {
                     if (strcasecmp(version, "HTTP/1.1")) {
                         clienterror(req, 
                                     bufi->addr, version, 
-                                    "501", "HTTP VERSION NOT SUPPORTED",
+                                    "501", "Not Implemented",
                                     "Liso does not support this http version");
                         bufi->stage = STAGE_ERROR;
                         FD_SET(conn_sock, &p->write_set);
@@ -539,9 +539,12 @@ void serve_clients(Pool *p) {
                     bufi->stage = STAGE_ERROR;
                     FD_SET(conn_sock, &p->write_set);
                     continue;
-                } else if (j == -1) {
-                    continue;
-                } else 
+                } else if (j == 0) {
+                    close_conn(p, i);
+                    continue;                    
+                } else if (j == -1)
+                    continue; 
+                else
                     bufi->stage = STAGE_BODY;
 
                 if (!strcmp(req->method, "POST")) {
@@ -699,9 +702,11 @@ void server_send(Pool *p) {
                 req->valid = REQ_INVALID;
                 req = req->next;
             }
-            if (bufi->stage == STAGE_ERROR || bufi->stage == STAGE_CLOSE) {
+            if (bufi->stage == STAGE_CLOSE) {
                 close_conn(p, i);
             }
+            if (bufi->stage == STAGE_ERROR)
+                bufi->stage = STAGE_MUV;
 
             FD_CLR(conn_sock, &p->write_set);                
         } /* end if FD_ISSET(conn_sock, &p->ready_write) */
@@ -827,6 +832,7 @@ void clienterror(Requests *req, char *addr, char *cause, char *errnum, char *sho
  *  @param p the pointer to the pool
  *  @return -1 received a line that does not terminated by \n
  *          -2 received a line that does not match the header format
+             0 EOF encountered
  */
 int read_requesthdrs(Buff *b, Requests *req) {
     int len = 0;
@@ -847,7 +853,7 @@ int read_requesthdrs(Buff *b, Requests *req) {
         len = strlen(buf);
 
         if (len == 0)
-            return -1;
+            return 0;
         b->cur_size += len;
 
         if (buf[len - 1] != '\n') return -1;
