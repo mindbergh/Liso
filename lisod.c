@@ -30,10 +30,10 @@
 #define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       0 /* Whether to print out debug infomations */
+#define VERBOSE       1 /* Whether to print out debug infomations */
 #define DATE_SIZE     35
 #define FILETYPE_SIZE 15
-#define DEAMON        1
+#define DEAMON        0
 #define AB            1
 
 
@@ -243,6 +243,8 @@ int main(int argc, char* argv[]) {
             if (SSL_accept(client_context) <= 0)
             {
                 fprintf(stderr, "Error accepting (handshake) client SSL context.\n");
+                close_socket(client_sock);
+                SSL_free(client_context);
                 continue;    
             }
             add_client_ssl(client_context, client_sock, &pool, (struct sockaddr_in *) &cli_addr, https_port);
@@ -712,7 +714,7 @@ void server_send(Pool *p) {
             if (bufi->stage == STAGE_ERROR)
                 bufi->stage = STAGE_MUV;
 
-            FD_CLR(conn_sock, &p->write_set);                
+            FD_CLR(conn_sock, &p->write_set);
         } /* end if FD_ISSET(conn_sock, &p->ready_write) */
 
         if (p->buf[i] == NULL)
@@ -732,7 +734,7 @@ void server_send(Pool *p) {
                     req->response = (char *)malloc(readret + 1);
                     strcpy(req->response, pipebuf);
                     req->valid = REQ_VALID;
-                    close(req->pipefd);
+                    close_socket(req->pipefd);
                     
                     p->cur_conn -= 1;
                     FD_SET(conn_sock, &p->write_set);

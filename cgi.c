@@ -252,6 +252,8 @@ void build_envp(char **envp, Buff *b, char *cgiquery) {
     envp[i++] = malloc_string("SERVER_PROTOCOL=HTTP/1.1");
     envp[i++] = malloc_string("SERVER_SOFTWARE=Liso/1.0");
     envp[i++] = malloc_string("SERVER_NAME=Liso/1.0");
+    if (b->client_context != NULL)
+        envp[i++] = malloc_string("HTTPS=1");
     hdr = req->header;
     while (hdr) {       
         if (!strcasecmp(hdr->key, "Content-Length")) {
