@@ -1143,6 +1143,7 @@ void serve_static(Buff *b, char *filename, struct stat sbuf) {
         close(srcfd);                       
         log_write(req, b->addr, date, "200", len + filesize);    
     } else {
+        req->body = NULL;
         log_write(req, b->addr, date, "200", len);
     }
  
