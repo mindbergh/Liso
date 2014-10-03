@@ -730,7 +730,7 @@ void server_send(Pool *p) {
                 req = req->next;
             }
             if (bufi->stage == STAGE_CLOSE) {
-                close_conn(p, i);
+                //close_conn(p, i);
             }
             if (bufi->stage == STAGE_ERROR)
                 bufi->stage = STAGE_MUV;
