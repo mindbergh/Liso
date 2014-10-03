@@ -623,6 +623,8 @@ void serve_clients(Pool *p) {
                         printf("Req->Connection: %s\n", value);
                     if (!strcmp(value, "Close"))
                         bufi->stage = STAGE_CLOSE;
+                    if (!strcmp(value, "close"))
+                        bufi->stage = STAGE_CLOSE;
                 }
             }
 
@@ -730,7 +732,7 @@ void server_send(Pool *p) {
                 req = req->next;
             }
             if (bufi->stage == STAGE_CLOSE) {
-                //close_conn(p, i);
+                close_conn(p, i);
             }
             if (bufi->stage == STAGE_ERROR)
                 bufi->stage = STAGE_MUV;
@@ -858,7 +860,7 @@ void clienterror(Requests *req, char *addr,
      /* Print the HTTPS response */
     sprintf(hdr, "HTTP/1.1 %s %s\r\n", errnum, shortmsg);
     sprintf(hdr, "%sContent-Type: text/html\r\n",hdr);
-    sprintf(hdr, "%sConnection: close\r\n",hdr);
+    sprintf(hdr, "%sConnection: Close\r\n",hdr);
     sprintf(hdr, "%sDate: %s\r\n",hdr, date);
     sprintf(hdr, "%sContent-Length: %d\r\n\r\n%s",hdr, 
                                                 (int)strlen(body), body);
