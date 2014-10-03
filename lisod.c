@@ -38,12 +38,6 @@
 
 
 
-
-
-
-
-
-
 /* Functions prototypes */
 void usage();
 int open_listen_socket(int port);
@@ -146,17 +140,10 @@ int main(int argc, char* argv[]) {
         daemonize(lock_file);
 
 
-
-
-
-
     sigemptyset(&mask);
     sigemptyset(&old_mask);
     sigaddset(&mask, SIGPIPE);
     sigprocmask(SIG_BLOCK, &mask, &old_mask);
-
-
-
 
 
     //signal(SIGPIPE, SIG_IGN);
@@ -379,7 +366,8 @@ void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) 
             bufi->buf = (char *)malloc(BUF_SIZE);
             bufi->stage = STAGE_MUV;
             bufi->request = (Requests *)malloc(sizeof(Requests));
-            bufi->request->response = (char *)malloc(BUF_SIZE);
+            //bufi->request->response = (char *)malloc(BUF_SIZE);
+            bufi->request->response = NULL;
             bufi->request->next = NULL;
             bufi->request->header = NULL;
             bufi->request->method = NULL;
@@ -425,7 +413,8 @@ void add_client_ssl(SSL *client_context, int conn_sock, Pool *p, struct sockaddr
             bufi->buf = (char *)malloc(BUF_SIZE);
             bufi->stage = STAGE_MUV;
             bufi->request = (Requests *)malloc(sizeof(Requests));
-            bufi->request->response = (char *)malloc(BUF_SIZE);
+            //bufi->request->response = (char *)malloc(BUF_SIZE);
+            bufi->request->response = NULL;
             bufi->request->next = NULL;
             bufi->request->header = NULL;
             bufi->request->method = NULL;
@@ -910,11 +899,18 @@ Requests *get_freereq(Buff *b) {
         
     } else {
         req->next = (Requests *)malloc(sizeof(Requests));
+
         req = req->next;  
     }
     req->pipefd = -1;
+    req->response = NULL;
     req->header = NULL;
     req->next = NULL;
+    req->method = NULL;
+    req->uri = NULL;
+    req->version = NULL;
+    req->valid = REQ_INVALID;
+    req->post_body = NULL;
     return req;
 }
 
