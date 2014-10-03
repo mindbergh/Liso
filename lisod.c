@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (FD_ISSET(ssl_sock, &pool.ready_read) && 
-                     pool.cur_conn <= FD_SETSIZE - 4) {
+                     pool.cur_conn <= FD_SETSIZE - 10) {
             
             if ((client_sock = accept(ssl_sock, 
                                     (struct sockaddr *) &cli_addr, 
@@ -254,12 +254,14 @@ int main(int argc, char* argv[]) {
         }
         
         if (FD_ISSET(listen_sock, &pool.ready_read) && 
-                     pool.cur_conn <= FD_SETSIZE - 4) {
-            
+                     pool.cur_conn <= FD_SETSIZE - 20) {
+            if (VERBOSE)
+                printf("Cur_conn = %d-----------------------------\n", pool.cur_conn);
             if ((client_sock = accept(listen_sock, 
                                     (struct sockaddr *) &cli_addr, 
                                     &cli_size)) == -1) {
-                clean_state(&pool, listen_sock, ssl_sock);
+                //clean_state(&pool, listen_sock, ssl_sock);
+                exit(1);
                 fprintf(stderr, "Error accepting connection.\n");
                 continue;
             }
@@ -619,7 +621,7 @@ void serve_clients(Pool *p) {
                 if (value) {
                     if (VERBOSE)
                         printf("Req->Connection: %s\n", value);
-                    if (!strcmp(value, "close"))
+                    if (!strcmp(value, "Close"))
                         bufi->stage = STAGE_CLOSE;
                 }
             }

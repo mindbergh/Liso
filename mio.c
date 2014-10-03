@@ -156,6 +156,7 @@ ssize_t mio_recvlineb(int fd, SSL *ssl_context, void *usrbuf, size_t maxlen)
 		} else {
 			if (errno == EWOULDBLOCK)
 				break;
+			printf("send error on %s\n", strerror(errno));
 		    return -1;	  /* error */
 		}
     }

@@ -171,7 +171,7 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
             return EXIT_FAILURE;
         }
         /*************** END EXECVE ****************/
-        free_envp(envp); 
+        //free_envp(envp); 
     }
 
     if (pid > 0)
