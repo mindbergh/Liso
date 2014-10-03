@@ -1126,7 +1126,10 @@ void serve_static(Buff *b, char *filename, struct stat sbuf) {
     sprintf(buf, "HTTP/1.1 200 OK\r\n");    
     sprintf(buf, "%sServer: Liso/1.0\r\n", buf);
     sprintf(buf, "%sDate:%s\r\n", buf, date);
-    sprintf(buf, "%sConnection:keep-alive\r\n", buf);
+    if (b->stage == STAGE_CLOSE)
+        sprintf(buf, "%sConnection: Close\r\n", buf);
+    else
+        sprintf(buf, "%sConnection: Keep-Alive\r\n", buf);
     sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
     sprintf(buf, "%sLast-Modified:%s\r\n", buf, modify_time);
     sprintf(buf, "%sContent-Type: %s\r\n\r\n", buf, filetype);
