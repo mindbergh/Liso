@@ -1,3 +1,9 @@
+/** @file loglib_test.c          
+ *  @brief This file contains test case for loglib
+ *  @auther Ming Fang - mingf@cs.cmu.edu
+ *  @bug I am finding
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "loglib.h"

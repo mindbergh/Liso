@@ -1,13 +1,8 @@
-/*****************************************************************************
- *                                                                           *
- * This file represents a hard-coded CGI driver example.  It will execute a  *
- * file, setup environment variables, and pipe stdin and stdout              *
- * appropriately.                                                            *
- *                                                                           *
- * Authors: Athula Balachandran <abalacha@cs.cmu.edu>                        *
- *          Charles Rang <rang@cs.cmu.edu>                                   *
- *          Wolfgang Richter <wolf@cs.cmu.edu>                               *
- *****************************************************************************/
+/** @file cgi.c          
+ *  @brief Functions for handle cgi requests
+ *  @auther Ming Fang - mingf@cs.cmu.edu
+ *  @bug I am finding
+ */
 
 
 
@@ -17,7 +12,7 @@
 /**************** BEGIN CONSTANTS ***************/
 #define BUF_SIZE    4096
 #define ENVP_SIZE   30
-#define VERBOSE     1
+#define VERBOSE     0
 
 /**************** END CONSTANTS ***************/
 
@@ -106,7 +101,14 @@ processes.\n");
 }
 /**************** END UTILITY FUNCTIONS ***************/
 
-
+/** @brief Serve a dynamic request
+ *  @param p Pool struct of the server
+ *  @param b Buff struct representing a connection
+ *  @param filename name of file to get dynamic content from
+ *  @param cgiquery string of query
+ *  @return EXIT_FAILURE on fail
+ *  @retuen EXIT_SUCCESS on success
+ */
 int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
     /*************** BEGIN VARIABLE DECLARATIONS **************/
     Requests *req = b->cur_request;
@@ -180,13 +182,16 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
         close(stdout_pipe[1]);
         close(stdin_pipe[0]);
         if (!strcmp(req->method, "POST")) {
-            if ((readret = write(stdin_pipe[1], req->post_body, strlen(req->post_body))) < 0)   
+            if ((readret = write(stdin_pipe[1], 
+                                 req->post_body, 
+                                 strlen(req->post_body))) < 0)
             {
                 fprintf(stderr, "Error writing to spawned CGI program.\n");
                 return EXIT_FAILURE;
             }
             if (VERBOSE)
-                printf("Write post %d bytes body:%s\n", readret, req->post_body);
+                printf("Write post %d bytes body:%s\n", 
+                        readret, req->post_body);
         }
 
         close(stdin_pipe[1]); /* finished writing to spawn */
@@ -226,7 +231,12 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
 
 
 
-
+/** @brief Build envp from connection info
+ *  @param envp pointer to put the envp
+ *  @param b Buff struct that represents a connection
+ *  @param cgiquery string of cgi query
+ *  @return Void
+ */
 void build_envp(char **envp, Buff *b, char *cgiquery) {
     Requests *req = b->cur_request;
     Headers *hdr = NULL;
@@ -295,7 +305,10 @@ void build_envp(char **envp, Buff *b, char *cgiquery) {
     envp[i] = NULL;
 }
 
-
+/** @brief Make a string of env
+ *  @param pointer of string to made from
+ *  @return point of string just malloced
+ */
 char *malloc_string(char *str) {
     int length = strlen(str);
     char *res = (char *)malloc(length + 1);
@@ -304,6 +317,11 @@ char *malloc_string(char *str) {
     return res;
 }
 
+
+/** @brief free the envp
+ *  @param pointer to the envp to be freeed
+ *  @return Void
+ */
 void free_envp(char **str) {
     int i = 0;
     while (str[i] != NULL)

@@ -27,14 +27,14 @@
 #include "cgi.h"
 
 #define BUF_SIZE      8192   /* Initial buff size */
-#define MAX_SIZE_HEADER 8192    /* Max length of size info for the incomming msg */
+#define MAX_SIZE_HEADER 8192 /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
 #define VERBOSE       0 /* Whether to print out debug infomations */
-#define DATE_SIZE     35
-#define FILETYPE_SIZE 15
-#define DEAMON        1
-#define AB            1
+#define DATE_SIZE     35 /* The max length for date string */
+#define FILETYPE_SIZE 15 /* The max length for file type */
+#define DEAMON        1 /* Wether to do daemon */
+#define AB            1  /* Wether to check http/1.1*/
 
 
 
@@ -42,21 +42,22 @@
 void usage();
 int open_listen_socket(int port);
 void init_pool(int listen_sock, int ssl_sock, Pool *p);
-void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port);
-void add_client_ssl(SSL *client_context, int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port);
+void add_client(int conn_sock, Pool *p,
+                struct sockaddr_in *cli_addr, int port);
+void add_client_ssl(SSL *client_context, int conn_sock, Pool *p, 
+                    struct sockaddr_in *cli_addr, int port);
 void serve_clients(Pool *p);
 void server_send(Pool *p);
 void clean_state(Pool *p, int listen_sock, int ssl_sock);
 
 void free_buf(Buff *bufi);
-void clienterror(Requests *req, char *addr, char *cause, char *errnum, char *shortmsg, char *longmsg);
+void clienterror(Requests *req, char *addr, char *cause,
+                 char *errnum, char *shortmsg, char *longmsg);
 int read_requesthdrs(Buff *b, Requests *req);
 void get_time(char *date);
 Requests *get_freereq(Buff *b);
 void put_header(Requests * req, char *key, char *value);
-char * get_header(Requests * req, char *key);
 void close_conn(Pool *p, int i);
-char * get_header(Requests * req, char *key);
 int parse_uri(Pool *p, char *uri, char *filename, char *cgiargs);
 void get_filetype(char *filename, char *filetype);
 void serve_static(Buff *b, char *filename, struct stat sbuf);
@@ -242,12 +243,14 @@ int main(int argc, char* argv[]) {
 
             if (SSL_accept(client_context) <= 0)
             {
-                fprintf(stderr, "Error accepting (handshake) client SSL context.\n");
+                fprintf(stderr, "Error accepting (handshake) "
+                                "client SSL context.\n");
                 close_socket(client_sock);
                 SSL_free(client_context);
                 continue;    
             }
-            add_client_ssl(client_context, client_sock, &pool, (struct sockaddr_in *) &cli_addr, https_port);
+            add_client_ssl(client_context, client_sock, &pool, 
+                          (struct sockaddr_in *) &cli_addr, https_port);
         }
         
         if (FD_ISSET(listen_sock, &pool.ready_read) && 
@@ -264,7 +267,8 @@ int main(int argc, char* argv[]) {
                 printf("New client %d accepted via http\n", client_sock);
 
             fcntl(client_sock, F_SETFL, O_NONBLOCK);
-            add_client(client_sock, &pool, (struct sockaddr_in *) &cli_addr, http_port);
+            add_client(client_sock, &pool, 
+                      (struct sockaddr_in *) &cli_addr, http_port);
         }
 
         serve_clients(&pool);
@@ -353,9 +357,12 @@ void init_pool(int listen_sock, int ssl_sock, Pool *p) {
 /** @brief Add a new client fd
  *  @param conn_sock The socket of client to be added
  *  @param p the pointer to the pool
+ *  @param cli_addr the struct contains addr info
+ *  @param port the port of the client
  *  @return Void
  */
-void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) {
+void add_client(int conn_sock, Pool *p, 
+                struct sockaddr_in *cli_addr, int port) {
     int i;
     Buff *bufi;
     p->cur_conn++;
@@ -402,7 +409,16 @@ void add_client(int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) 
     }
 }
 
-void add_client_ssl(SSL *client_context, int conn_sock, Pool *p, struct sockaddr_in *cli_addr, int port) {
+/** @brief Add a new client fd
+ *  @param client_context The SSL struct of SSL connection
+ *  @param p the pointer to the pool
+ *  @param cli_addr the struct contains addr info
+ *  @param port the port of the client
+ *  @return Void
+ */
+void add_client_ssl(SSL *client_context, 
+                    int conn_sock, Pool *p, 
+                    struct sockaddr_in *cli_addr, int port) {
     int i;
     Buff *bufi;
     p->cur_conn++;
@@ -520,7 +536,7 @@ void serve_clients(Pool *p) {
                         clienterror(req, 
                                     bufi->addr, version, 
                                     "501", "Not Implemented",
-                                    "Liso does not support this http version");
+                                    "Liso does not support the http version");
                         bufi->stage = STAGE_ERROR;
                         FD_SET(conn_sock, &p->write_set);
                         continue;
@@ -550,7 +566,8 @@ void serve_clients(Pool *p) {
                     bufi->stage = STAGE_BODY;
 
                 if (!strcmp(req->method, "POST")) {
-                    if (NULL == (value = get_hdr_value_by_key(req->header, "Content-Length"))) {
+                    if (NULL == (value = get_hdr_value_by_key(req->header, 
+                                                     "Content-Length"))) {
                         clienterror(bufi->cur_request,
                                 bufi->addr, "", 
                                 "411", "Length Required",
@@ -580,7 +597,6 @@ void serve_clients(Pool *p) {
                     } else {
                         readret = recv(conn_sock, buf, BUF_SIZE - 1, 0);        
                     }
-                    //readret = mio_recvn(conn_sock, client_context, buf, BUF_SIZE - 1);
                     if (VERBOSE)
                         printf("readret =  %d\n", readret);
                     if (readret != length) {
@@ -678,7 +694,8 @@ void server_send(Pool *p) {
                 }
 
                 if ((sendret = mio_sendn(conn_sock, client_context, 
-                                         req->response, strlen(req->response))) > 0) {
+                                         req->response, 
+                                         strlen(req->response))) > 0) {
                     if (VERBOSE)
                         printf("Server send header to %d\n", conn_sock);
                     
@@ -692,9 +709,11 @@ void server_send(Pool *p) {
 
                 if (req->body != NULL) {
                     if ((sendret = mio_sendn(conn_sock, client_context,
-                                             req->body, req->body_size)) > 0) {
+                                             req->body, 
+                                             req->body_size)) > 0) {
                         if (VERBOSE)
-                            printf("Server send %d bytes to %d\n",(int)sendret, conn_sock);
+                            printf("Server send %d bytes to %d\n",
+                                   (int)sendret, conn_sock);
                         munmap(req->body, req->body_size);
                         req->body = NULL;
                     } else {                        
@@ -727,7 +746,9 @@ void server_send(Pool *p) {
                     if (VERBOSE)
                         printf("About to read from pipe\n");
                     char pipebuf[BUF_SIZE];
-                    readret = mio_readn(req->pipefd, NULL, pipebuf, BUF_SIZE-1);
+                    readret = mio_readn(req->pipefd, 
+                                        NULL, pipebuf, 
+                                        BUF_SIZE-1);
                     pipebuf[readret] = '\0';
                     if (VERBOSE)
                         printf("Pipe return:%s\n", pipebuf);
@@ -771,7 +792,10 @@ void clean_state(Pool *p, int listen_sock, int ssl_sock) {
     p->cur_conn = 0;
 }
 
-
+/** @brief Free a Buff struct that represents a connection
+ *  @param bufi the Buff struct to be freeed
+ *  @return Void
+ */
 void free_buf(Buff *bufi) {
     Headers *hdr = NULL;
     Headers *hdr_pre = NULL;
@@ -808,8 +832,18 @@ void free_buf(Buff *bufi) {
     free(bufi);
 }
 
-
-void clienterror(Requests *req, char *addr, char *cause, char *errnum, char *shortmsg, char *longmsg) {
+/** @brief Set clienterror
+ *  @param req the Requests struct that represents a connection
+ *  @param addr the address string
+ *  @param cause the string about the cause
+ *  @param errnum error status number
+ *  @param shortmsg the string of shortmsg to be sent
+ *  @param longmsg the string of longmsg to be sent
+ *  @return Void
+ */
+void clienterror(Requests *req, char *addr, 
+                 char *cause, char *errnum, char *shortmsg, 
+                 char *longmsg) {
     char date[DATE_SIZE], body[BUF_SIZE], hdr[BUF_SIZE];
     int len = 0;
     get_time(date);
@@ -824,7 +858,8 @@ void clienterror(Requests *req, char *addr, char *cause, char *errnum, char *sho
     sprintf(hdr, "%sContent-Type: text/html\r\n",hdr);
     sprintf(hdr, "%sConnection: close\r\n",hdr);
     sprintf(hdr, "%sDate: %s\r\n",hdr, date);
-    sprintf(hdr, "%sContent-Length: %d\r\n\r\n%s",hdr, (int)strlen(body), body);
+    sprintf(hdr, "%sContent-Length: %d\r\n\r\n%s",hdr, 
+                                                (int)strlen(body), body);
     len = strlen(hdr);
     req->response = (char *)malloc(len + 1);
     sprintf(req->response, "%s", hdr);
@@ -885,6 +920,10 @@ int read_requesthdrs(Buff *b, Requests *req) {
 }
 
 
+/** @brief get time
+ *  @param date the string to put time
+ *  @return Void
+ */
 void get_time(char *date) {
     time_t t;
     struct tm *tmp;
@@ -893,6 +932,11 @@ void get_time(char *date) {
     strftime(date, DATE_SIZE, "%a, %d %b %Y %T %Z", tmp);
 }
 
+
+/** @brief Retuen a available Requests struct and init it
+ *  @param b the Buff that represents a connection
+ *  @return a pointer to the new Requests
+ */
 Requests *get_freereq(Buff *b) {
     Requests *req = b->request;
     while (req->valid == REQ_VALID) {
@@ -928,6 +972,12 @@ Requests *get_freereq(Buff *b) {
     return req;
 }
 
+/** @brief Put key value pairs of a header in linked list
+ *  @param req the pointer to the head of the linked list
+ *  @param key the key string
+ *  @param value the value string 
+ *  @return Void
+ */
 void put_header(Requests * req, char *key, char *value) {
     Headers *hdr = req->header;
     if (req->header == NULL) {
@@ -952,21 +1002,11 @@ void put_header(Requests * req, char *key, char *value) {
     strcpy(hdr->value, value);
 }
 
-
-char * get_header(Requests * req, char *key) {
-    Headers *hdr = req->header;
-    while (hdr != NULL) {
-        if (strcasecmp(hdr->key, key)) {
-            hdr = hdr->next;
-            continue;
-        } else {
-            return hdr->value;
-        }
-    }        
-    return NULL;
-}
-
-
+/** @brief Close given connection
+ *  @param p the Pool struct
+ *         i the ith connection in the pool
+ *  @return Void
+ */
 void close_conn(Pool *p, int i) {
     //if (p->buf[i] == NULL)
         //return;
@@ -1023,7 +1063,11 @@ int parse_uri(Pool *p, char *uri, char *filename, char *cgiargs) {
 }
 
 
-
+/** @brief set filetype of a file
+ *  @param filename the string of filename to look at
+ *  @param filetype the string to put the filetype
+ *  @return void
+ */
 void get_filetype(char *filename, char *filetype) {
     if (strstr(filename, ".html"))
         strcpy(filetype, "text/html");
@@ -1039,6 +1083,13 @@ void get_filetype(char *filename, char *filetype) {
         strcpy(filetype, "text/plain");
 } 
 
+/** @brief put method, uri and version to the Requests struct
+ *  @param req the Requests struct to put things in
+ *  @param method the string of method
+ *  @param uri the string of uri
+ *  @param version the string of version
+ *  @return Void
+ */
 void put_req(Requests *req, char *method, char *uri, char *version) {
     req->method = (char *)malloc(strlen(method) + 1);
     req->uri = (char *)malloc(strlen(uri) + 1);
@@ -1049,7 +1100,12 @@ void put_req(Requests *req, char *method, char *uri, char *version) {
 } 
 
 
-
+/** @brief Serve static content
+ *  @param b the Buff struct that represent a connection
+ *  @param filename the name of file to be sent
+ *  @param sbuf the stat struct contain file attributes
+ *  @return Void
+ */
 void serve_static(Buff *b, char *filename, struct stat sbuf) {
     int srcfd;
     int filesize = sbuf.st_size;
@@ -1059,7 +1115,8 @@ void serve_static(Buff *b, char *filename, struct stat sbuf) {
     char modify_time[DATE_SIZE];
 
 
-    strftime(modify_time, DATE_SIZE, "%a, %d %b %Y %T %Z", localtime(&sbuf.st_mtime));
+    strftime(modify_time, DATE_SIZE, "%a, %d %b %Y %T %Z", 
+             localtime(&sbuf.st_mtime));
     
     get_time(date);
     /* Send response headers to client */
@@ -1108,6 +1165,11 @@ int is_valid_method(char *method) {
     return 0;
 }
 
+/** @brief Get header value by key
+ *  @param hdr the pointer to the header to look up
+ *  @param key the pointer to the key to look up
+ *  @return the string of value
+ */
 char *get_hdr_value_by_key(Headers *hdr, char *key) {
     while (hdr) {
         if(!strcmp(hdr->key, key)) {
@@ -1118,6 +1180,11 @@ char *get_hdr_value_by_key(Headers *hdr, char *key) {
     return NULL;
 }
 
+/** @brief is the input string numeric
+ *  @param str the pointer to the string to be tested
+ *  @return 0 on no
+ *          1 on yes
+ */
 int isnumeric(char *str) {
   while(*str) {
     if(!isdigit(*str))
@@ -1127,8 +1194,10 @@ int isnumeric(char *str) {
   return 1;
 }
 
-/** 
- * internal function daemonizing the process
+/** @brief Daemonize the server
+ *  @param lock_file the the name of file to lock 
+ *  @return EXIT_FAILURE on fail
+ *  @return EXIT_SUCCESS on success
  */
 int daemonize(char* lock_file)
 {
@@ -1164,15 +1233,17 @@ int daemonize(char* lock_file)
 
         signal(SIGHUP, signal_handler); /* hangup signal */
         signal(SIGTERM, signal_handler); /* software termination signal from kill */
-
-        // TODO: log --> "Successfully daemonized lisod process, pid %d."
-        log_write_string("Successfully daemonized lisod process, pid: %s\n", str);
+        log_write_string("Successfully daemonized lisod process, pid: %s\n",
+                         str);
 
         return EXIT_SUCCESS;
 }
 
 
-
+/** @brief Shutdown the server
+ *  @param ret the parameter feed to exit()
+ *  @return Void
+ */
 void liso_shutdown(int ret) {
     log_write_string("Liso shutdown\n");
     log_close();

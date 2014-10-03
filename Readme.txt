@@ -18,6 +18,8 @@
         [DES-3] Description of Files for checkpoint1
         [DES-4] Description of Design for checkpoint2
         [DES-5] Description of Files for checkpoint2
+        [DES-4] Description of Design for checkpoint3
+        [DES-5] Description of Files for checkpoint3
 
 [DES-2] Description of Design for checkpoint1
 --------------------------------------------------------------------------------
@@ -89,12 +91,40 @@ purposes are:
         .../mio.h               - Header for IO functions
         .../loglib.c            - C file for log related functions
         .../loglib.h            - Header for log related functions
+        .../liglib_test         - Test cases for loglib
         .../Makefile            - Contains rules for make
         .../tests.txt           - your test cases and any known issues you have
         .../vulnerabilities.ext - The vulnerabilities for my impementation
 
 
+[DES-3] Description of Design for checkpoint3
+--------------------------------------------------------------------------------
+This is a server called Liso, which is a selec()-based server that 
+supports GET, POST, HEAD http requests and cgi. 
 
+
+
+[DES-3] Description of Files for checkpoint3
+--------------------------------------------------------------------------------
+
+Here is a listing of all files associated with Recitation 1 and what their
+purposes are:
+
+        .../Readme.txt          - Current document 
+        .../lisod.c             - Liso echo server
+        .../mio.c               - C file for IO functions
+        .../mio.h               - Header for IO functions
+        .../cgi.c               - C file foi cgi functions
+        .../cgi.h               - Header for cgi functions
+        .../loglib.c            - C file for log related functions
+        .../loglib.h            - Header for log related functions
+        .../Makefile            - Contains rules for make
+        .../tests.txt           - your test cases and any known issues you have
+        .../vulnerabilities.ext - The vulnerabilities for my impementation
+        .../flaskr              - Folder that contains the Flaskr blog
+        .../ssl_client.py       - script to test ssl requests by urllib
+        .../ssl_socket.py       - script to test ssl requests by socket
+        .../keepalive.py        - scripte to test keepalive
 
 
 ./lisod 8887 9999 log a ./static_site . ./mingf.key ./mingf.crt

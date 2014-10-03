@@ -1,7 +1,7 @@
 ################################################################################
 # TESTS                                                                        #
 #                                                                              #
-# Description: This file describes the test methods for Checkpoint1.           #
+# Description: This file describes the test methods for Liso                   #
 #                                                                              #
 # Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
 #                                                                              #
@@ -15,6 +15,7 @@
         [TOC-1] Table of Contents
         [CKP-1] Description of Test Cases for Checkpoint 1
         [CKP-2] Description of Test Cases for Checkpoint 2
+        [CKP-3] Description of Test Cases for Checkpoint 3
 
 
 [CKP-1] Description of Test Cases for Checkpoint 1
@@ -95,5 +96,38 @@ Doweload a file of 120MB by browser and check if its md5 matches the original fi
 5. Test for concurrency
 Using apache bench to perform 100,000 requests with concurrency level 1019.
 ab -k -n 1000000 -c 1019 -t 20 http://127.0.0.1:port/
+
+
+[CKP-3] Description of Test Cases for Checkpoint 3
+--------------------------------------------------------------------------------
+1. Test for method other than "GET", "HEAD", "POST"
+Telnet to Liso and send invalid request, Liso return 501 error
+
+2. Test for invalid content-length header
+Send POST without content-length, Liso return bad request
+Send POST with content-length that is not a valid number, Liso return bad request
+Send POST with content-length different than actual length of post body, Liso return bad request
+
+3. Test for connection: keep-alive
+Use apache bench with -k 
+Use python script sending a large number of GET requests without calling recv.
+
+4. Test for TLS
+Use apache bench to visit https://domain:port/
+Use browser to visit https://domain:port/
+Use python script to send different TLS requests
+
+5. Test for cgi envirnoment variables
+Use cgi_dumper.py to dump the variables and make sure they are all right
+
+6. Test for blog
+Visit flaskr blog by browser in both http and https to test different functionalities :
+log in with correct username and password
+log in with incorrect username or password
+log out
+add new posts
+
+
+
 
 
