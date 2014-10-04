@@ -759,6 +759,7 @@ void server_send(Pool *p) {
                         
                         pipebuf[readret] = '\0';
                         strcat(req->response, pipebuf);
+                        printf("while entered!\n");
                     }
                     if (VERBOSE)
                         printf("Pipe return:%s\n", req->response);
@@ -891,6 +892,7 @@ void clienterror(Requests *req, char *addr,
 int read_requesthdrs(Buff *b, Requests *req) {
     int len = 0;
     int i;
+    char *tmp;
     char key[BUF_SIZE];
     char value[BUF_SIZE];
     char *buf = b->buf + b->cur_parsed;
@@ -918,9 +920,17 @@ int read_requesthdrs(Buff *b, Requests *req) {
         if (!strcmp(buf, "\r\n"))
             break;
 
-        i = sscanf(b->buf + b->cur_parsed, "%[^':']: %[^'\r\n']", key, value);
-
-        if (i != 2) return -2;
+        //i = sscanf(b->buf + b->cur_parsed, "%[^':']: %[^'\r\n']", key, value);
+        tmp = strchr(b->buf + b->cur_parsed, ':');
+        if (NULL == tmp)
+            return -2;
+        *tmp = '\0';
+        strcpy(key, b->buf + b->cur_parsed);
+        strcpy(value, tmp + 2);
+        value[strlen(value) - 1] = '\0';
+        if (VERBOSE)
+            printf("key = %s, value = %s\n", key, value);
+        *tmp = ':';
         
         b->cur_parsed += len;
         
