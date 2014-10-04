@@ -257,7 +257,7 @@ int main(int argc, char* argv[]) {
         if (FD_ISSET(listen_sock, &pool.ready_read) && 
                      pool.cur_conn <= FD_SETSIZE - 20) {
             if (VERBOSE)
-                printf("Cur_conn = %d-----------------------------\n", pool.cur_conn);
+                printf("Cur_conn = %d----------------\n", pool.cur_conn);
             if ((client_sock = accept(listen_sock, 
                                     (struct sockaddr *) &cli_addr, 
                                     &cli_size)) == -1) {
@@ -919,8 +919,6 @@ int read_requesthdrs(Buff *b, Requests *req) {
 
         if (!strcmp(buf, "\r\n"))
             break;
-
-        //i = sscanf(b->buf + b->cur_parsed, "%[^':']: %[^'\r\n']", key, value);
         tmp = strchr(b->buf + b->cur_parsed, ':');
         if (NULL == tmp)
             return -2;

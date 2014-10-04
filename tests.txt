@@ -110,7 +110,7 @@ Send POST with content-length different than actual length of post body, Liso re
 
 3. Test for connection: keep-alive
 Use apache bench with -k 
-Use python script sending a large number of GET requests without calling recv.
+Use python script sending a large number of GET and HEAD requests without calling recv.
 
 4. Test for TLS
 Use apache bench to visit https://domain:port/
@@ -121,7 +121,7 @@ Use python script to send different TLS requests
 Use cgi_dumper.py to dump the variables and make sure they are all right
 
 6. Test for blog
-Visit flaskr blog by browser in both http and https to test different functionalities :
+Visit flaskr blog by browser in both http and https to test different functionalities:
 log in with correct username and password
 log in with incorrect username or password
 log out

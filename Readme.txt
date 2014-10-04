@@ -1,7 +1,7 @@
 ################################################################################
 # README                                                                       #
 #                                                                              #
-# Description: This file serves as a README and documentation for Checkpoint1. #
+# Description: This file serves as a README and documentation.                 #
 #                                                                              #
 # Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
 #                                                                              #
@@ -103,13 +103,14 @@ This is a server called Liso, which is a selec()-based server that
 supports GET, POST, HEAD http requests and cgi. It also contains a dynamic blog
 implemented by Flaskr, which supports browsing, adding entries, login and logout
 operations. 
+Liso supports persistent connections
+Liso supports requests and responses logging
+Liso support HTTPS connections
 Liso returns 200 on good request.
 Liso returns 411 on POST request without Content-Length field
-Liso returns 400 on bad request.
+Liso returns 400 on all kinds of bad requests.
 Liso returns 404 on not finding target file
 Liso returns 501 on method other than 'GET', 'POST', 'HEAD'
-  
-
 
 [DES-3] Description of Files for checkpoint3
 --------------------------------------------------------------------------------

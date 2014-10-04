@@ -24,7 +24,6 @@ lisod: $(objects)
 lisod.o: lisod.c mio.h loglib.h cgi.h
 mio.o: mio.c mio.h
 cgi.o: cgi.c cgi.h mio.h
-#liso_ssl.o: liso_ssl.c liso_ssl.h mio.h
 loglib.o: loglib.c loglib.h mio.h
 loglib_test.o: loglib_test.c loglib.h mio.h
 
