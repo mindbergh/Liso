@@ -751,14 +751,19 @@ void server_send(Pool *p) {
                     if (VERBOSE)
                         printf("About to read from pipe\n");
                     char pipebuf[BUF_SIZE];
-                    readret = read(req->pipefd, 
+                    req->response = (char *)malloc(4096);
+                    strcpy(req->response, "");
+                    while ((readret = read(req->pipefd, 
                                         pipebuf, 
-                                        BUF_SIZE-1);
-                    pipebuf[readret] = '\0';
+                                        BUF_SIZE-1)) > 0) {
+                        
+                        pipebuf[readret] = '\0';
+                        strcat(req->response, pipebuf);
+                    }
                     if (VERBOSE)
-                        printf("Pipe return:%s\n", pipebuf);
-                    req->response = (char *)malloc(readret + 1);
-                    strcpy(req->response, pipebuf);
+                        printf("Pipe return:%s\n", req->response);
+                    
+                    //strcpy(req->response, pipebuf);
                     req->valid = REQ_VALID;
                     close_socket(req->pipefd);
                     
