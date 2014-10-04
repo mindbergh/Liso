@@ -901,15 +901,13 @@ int read_requesthdrs(Buff *b, Requests *req) {
     if (VERBOSE)
         printf("entering read request:\n%s", buf);
 
-    //printf("%d\n", strcmp(buf, "\r\n"));
-
     while (1) {
         buf += len;
         mio_recvlineb(b->fd, b->client_context, buf, b->size - b->cur_size);
         len = strlen(buf);
 
         if (len == 0)
-            return 0;
+            return 1;
         b->cur_size += len;
 
         if (buf[len - 1] != '\n') return -1;
@@ -1073,8 +1071,6 @@ int parse_uri(Pool *p, char *uri, char *filename, char *cgiargs) {
         } else 
             strcpy(cgiargs, "");                         
         strcpy(filename, p->cgi);  /* cgi */                         
-        //strcat(filename, uri + 4);   /* skip '/cgi/' */
-        //uri += 4; /* skip '/cgi'*/
         if (VERBOSE) {
             printf("Dynamic!\n");
             printf("uri:%s\n", uri);

@@ -100,8 +100,15 @@ purposes are:
 [DES-3] Description of Design for checkpoint3
 --------------------------------------------------------------------------------
 This is a server called Liso, which is a selec()-based server that 
-supports GET, POST, HEAD http requests and cgi. 
-
+supports GET, POST, HEAD http requests and cgi. It also contains a dynamic blog
+implemented by Flaskr, which supports browsing, adding entries, login and logout
+operations. 
+Liso returns 200 on good request.
+Liso returns 411 on POST request without Content-Length field
+Liso returns 400 on bad request.
+Liso returns 404 on not finding target file
+Liso returns 501 on method other than 'GET', 'POST', 'HEAD'
+  
 
 
 [DES-3] Description of Files for checkpoint3
@@ -125,6 +132,3 @@ purposes are:
         .../ssl_client.py       - script to test ssl requests by urllib
         .../ssl_socket.py       - script to test ssl requests by socket
         .../keepalive.py        - scripte to test keepalive
-
-
-./lisod 8887 9999 log a ./static_site . ./mingf.key ./mingf.crt
