@@ -148,4 +148,4 @@ def run_with_cgi(application):
 
 if __name__ == '__main__':
     #app.run();
-    run_with_cgi(apap)
+    run_with_cgi(app)
