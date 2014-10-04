@@ -205,22 +205,11 @@ int serve_dynamic(Pool *p, Buff *b, char *filename, char *cgiquery) {
         req->valid = REQ_PIPE;
         req->pipefd = stdout_pipe[0];
 
-            // int flag = fcntl(req->pipefd, F_GETFL, 0);
-            // fcntl(req->pipefd, F_SETFL, flag | O_NONBLOCK);
         FD_SET(req->pipefd, &p->read_set);
         if (req->pipefd > p->maxfd)
             p->maxfd = req->pipefd;
         p->cur_conn += 1;
 
-        //close(stdout_pipe[0]);
-        //close(stdin_pipe[1]);
-
-//         if (readret == 0)
-//         {
-//             fprintf(stdout, "CGI spawned process returned with EOF as 
-// expected.\n");
-//             return EXIT_SUCCESS;
-//         }
         return EXIT_SUCCESS;
     }
     /*************** END FORK **************/
