@@ -50,7 +50,7 @@ void serve_clients(Pool *p);
 void server_send(Pool *p);
 void clean_state(Pool *p, int listen_sock, int ssl_sock);
 
-void free_buf(Buff *bufi);
+void free_buf(Pool *p, Buff *bufi);
 void clienterror(Requests *req, char *addr, char *cause,
                  char *errnum, char *shortmsg, char *longmsg);
 int read_requesthdrs(Buff *b, Requests *req);
@@ -202,6 +202,7 @@ int main(int argc, char* argv[]) {
         pool.ready_write = pool.write_set;
         if (VERBOSE)
             printf("New select\n");
+
         pool.nready = select(pool.maxfd + 1,
                             &pool.ready_read, 
                             &pool.ready_write, NULL, NULL);
@@ -260,8 +261,8 @@ int main(int argc, char* argv[]) {
             if ((client_sock = accept(listen_sock, 
                                     (struct sockaddr *) &cli_addr, 
                                     &cli_size)) == -1) {
-                //clean_state(&pool, listen_sock, ssl_sock);
-                exit(1);
+                clean_state(&pool, listen_sock, ssl_sock);
+                //exit(1);
                 fprintf(stderr, "Error accepting connection.\n");
                 continue;
             }
@@ -750,8 +751,8 @@ void server_send(Pool *p) {
                     if (VERBOSE)
                         printf("About to read from pipe\n");
                     char pipebuf[BUF_SIZE];
-                    readret = mio_readn(req->pipefd, 
-                                        NULL, pipebuf, 
+                    readret = read(req->pipefd, 
+                                        pipebuf, 
                                         BUF_SIZE-1);
                     pipebuf[readret] = '\0';
                     if (VERBOSE)
@@ -787,7 +788,7 @@ void clean_state(Pool *p, int listen_sock, int ssl_sock) {
             }   
             p->cur_conn--;
             FD_CLR(conn_sock, &p->read_set);
-            free_buf(p->buf[i]);
+            free_buf(p, p->buf[i]);
             p->buf[i] = NULL;                               
         }
     }
@@ -800,7 +801,7 @@ void clean_state(Pool *p, int listen_sock, int ssl_sock) {
  *  @param bufi the Buff struct to be freeed
  *  @return Void
  */
-void free_buf(Buff *bufi) {
+void free_buf(Pool *p, Buff *bufi) {
     Headers *hdr = NULL;
     Headers *hdr_pre = NULL;
     Requests *req = NULL;
@@ -828,8 +829,11 @@ void free_buf(Buff *bufi) {
             free(req_pre->version);
         if (req_pre->post_body)
             free(req_pre->post_body);
-        if (req_pre->pipefd != -1)
+        if (req_pre->pipefd != -1) {
+            FD_CLR(req_pre->pipefd, &p->read_set);
+            FD_CLR(req_pre->pipefd, &p->write_set);
             close(req_pre->pipefd);
+        }
         free(req_pre->response);
         free(req_pre);
     }
@@ -1019,7 +1023,7 @@ void close_conn(Pool *p, int i) {
         fprintf(stderr, "Error closing client socket.\n");                        
     }
     p->cur_conn--;
-    free_buf(p->buf[i]);
+    free_buf(p, p->buf[i]);
     FD_CLR(conn_sock, &p->read_set);
     FD_CLR(conn_sock, &p->write_set);
     p->buf[i] = NULL;
