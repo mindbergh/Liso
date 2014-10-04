@@ -750,19 +750,18 @@ void server_send(Pool *p) {
                     if (VERBOSE)
                         printf("About to read from pipe\n");
                     char pipebuf[BUF_SIZE];
-                    readret = mio_readn(req->pipefd, 
-                                        NULL, pipebuf, 
-                                        BUF_SIZE-1);
-                    pipebuf[readret] = '\0';
+                    while ((readret = read(req->pipefd, pipebuf, BUF_SIZE-1)) > 0) {
+                        mio_sendn(conn_sock, client_context,
+                                             pipebuf, 
+                                             readret);                        
+                    }
                     if (VERBOSE)
                         printf("Pipe return:%s\n", pipebuf);
-                    req->response = (char *)malloc(readret + 1);
-                    strcpy(req->response, pipebuf);
-                    req->valid = REQ_VALID;
+                    req->response = NULL;        
+                    req->valid = REQ_INVALID;
                     close_socket(req->pipefd);
                     
                     p->cur_conn -= 1;
-                    FD_SET(conn_sock, &p->write_set);
                     FD_CLR(req->pipefd, &p->read_set);
                     req->pipefd = -1;   
                 }
