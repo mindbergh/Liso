@@ -622,10 +622,12 @@ void serve_clients(Pool *p) {
                 if (value) {
                     if (VERBOSE)
                         printf("Req->Connection: %s\n", value);
-                    if (!strcmp(value, "Close"))
+                    if (!strcmp(value, "Close")) {
                         bufi->stage = STAGE_CLOSE;
-                    if (!strcmp(value, "close"))
+                    }
+                    if (!strcmp(value, "close")) {
                         bufi->stage = STAGE_CLOSE;
+                    }
                 }
             }
 
@@ -925,7 +927,7 @@ int read_requesthdrs(Buff *b, Requests *req) {
         *tmp = '\0';
         strcpy(key, b->buf + b->cur_parsed);
         strcpy(value, tmp + 2);
-        value[strlen(value) - 1] = '\0';
+        value[strlen(value) - 2] = '\0';
         if (VERBOSE)
             printf("key = %s, value = %s\n", key, value);
         *tmp = ':';
