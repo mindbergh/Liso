@@ -30,10 +30,10 @@
 #define MAX_SIZE_HEADER 8192 /* Max length of size info for the incomming msg */
 #define ARG_NUMBER    8    /* The number of argument lisod takes*/
 #define LISTENQ       1024   /* second argument to listen() */
-#define VERBOSE       0 /* Whether to print out debug infomations */
+#define VERBOSE       1 /* Whether to print out debug infomations */
 #define DATE_SIZE     35 /* The max length for date string */
 #define FILETYPE_SIZE 15 /* The max length for file type */
-#define DEAMON        1 /* Wether to do daemon */
+#define DEAMON        0 /* Wether to do daemon */
 #define AB            1  /* Wether to check http/1.1*/
 
 
@@ -750,18 +750,19 @@ void server_send(Pool *p) {
                     if (VERBOSE)
                         printf("About to read from pipe\n");
                     char pipebuf[BUF_SIZE];
-                    while ((readret = read(req->pipefd, pipebuf, BUF_SIZE-1)) > 0) {
-                        mio_sendn(conn_sock, client_context,
-                                             pipebuf, 
-                                             readret);                        
-                    }
+                    readret = mio_readn(req->pipefd, 
+                                        NULL, pipebuf, 
+                                        BUF_SIZE-1);
+                    pipebuf[readret] = '\0';
                     if (VERBOSE)
                         printf("Pipe return:%s\n", pipebuf);
-                    req->response = NULL;        
-                    req->valid = REQ_INVALID;
+                    req->response = (char *)malloc(readret + 1);
+                    strcpy(req->response, pipebuf);
+                    req->valid = REQ_VALID;
                     close_socket(req->pipefd);
                     
                     p->cur_conn -= 1;
+                    FD_SET(conn_sock, &p->write_set);
                     FD_CLR(req->pipefd, &p->read_set);
                     req->pipefd = -1;   
                 }
