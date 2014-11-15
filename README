@@ -1,9 +1,12 @@
 ################################################################################
 # README                                                                       #
 #                                                                              #
-# Description: This file serves as a README and documentation for Checkpoint1. #
+# Description: This file serves as a README and documentation for the example  #
+#              15-441 CGI code and demo Python scripts.                        #
 #                                                                              #
-# Authors: Ming Fang <mingf@cs.cmu.edu>,                                       #
+# Authors: Athula Balachandran <abalacha@cs.cmu.edu>,                          #
+#          Charles Rang <rang@cs.cmu.edu>,                                     #
+#          Wolf Richter <wolf@cs.cmu.edu>                                      #
 #                                                                              #
 ################################################################################
 
@@ -23,14 +26,30 @@
 [DES-2] Description of Files
 --------------------------------------------------------------------------------
 
-Here is a listing of all files associated with Recitation 1 and what their'
+Here is a listing of all files associated with Recitation 4 and what their
 purpose is:
 
-                    .../README              - Current document 
-                    .../echo_client.c       - Simple echo network client
-                    .../lisod.c             - Simple echo network server
-                    .../Makefile            - Contains rules for make
-                    .../cp1_checker.py      - Python test script for CP1
+                    .../README                     - Current document 
+                    .../Makefile                   - for make convenience;
+                                                     builds an cgi executable
+                    .../cgi_example.c              - Example server source code
+                    .../cgi_script.py              - Minimal Python CGI example
+                    .../cgi_dumper.py              - Non-CGI conformant,
+                                                     dumping script
+                    .../example.GET                - Valid HTTP Request forming
+                                                     the basis for hard-coded
+                                                     values in cgi_example.c
+
+
+***** NOTE: The code is not feature complete, doesn't use select etc.
+            It is meant more to demonstrate proper CGI setup and teardown.
+
+            You will need to:
+
+                    (1) Integrate the fd's of the pipes into your select() loop
+                    (2) Collect all necessary headers to pass as environment
+                        variables to the CGI executable
+                    (3) Send data coming back via stdout to a client socket
 
 
 
@@ -38,34 +57,22 @@ purpose is:
 [RUN-3] How to Run
 --------------------------------------------------------------------------------
 
-Building and executing the echo code should be very simple:
+Do this in one console to run the echo SSL server:
 
-                    cd src
                     make
-                    ./echo_server
-                    ./echo_client 127.0.0.1 9999
+                    ./cgi
 
-This should allow you to input characters on stdin which will be sent to the
-echo server.  The echo server has a hard-coded serving port of 9999.  Any input
-characters to stdin will be flushed to the server on return, and any bytes
-received from the server will appear on stdout.
+By default, the ./cgi executable is hard-coded to run the cgi_script.py.  It
+prints the stdout of the executable it runs to your stdout.
 
-In addition, a telnet client may also be used in a similar fashion for
-communicating with the server:
+You may also try this out with the cgi_dumper.py executable to see
+different/simpler output.
 
-                    cd src
-                    make
-                    ./echo_server
-                    telnet 127.0.0.1 9999
+This demo does not really show off sending data via stdin to the spawned
+process, but you will have to do that in the event that the HTTP/1.1 Request
+has content.
 
-The test Python script takes a series of arguments and can be run as:
 
-                    cd src
-                    make
-                    ./echo_server
-                    ./cp1_checker 127.0.0.1 9999 1000 10 2048 500
 
-with arguments as such:
 
-                    <ip> <port> <# trials> <# writes and reads per trial> \
-                    <max # bytes to write at a time> <# connections> 
+./lisod 8885 9999 log lock ./static_site ./flaskr/flaskr.py ./mingf.key ./mingf.crt
